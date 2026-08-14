@@ -4,15 +4,20 @@ using UnityEngine;
 
 public class Enemy : MonoBehaviour
 {
-    public List<ColorType> patterns { get; private set; }
+    public List<ColorType> pattern { get; private set; }
+
+    public void Setup(EnemyData enemyData)
+    {
+        pattern = new(enemyData.pattern);
+    }
 
 
     public void OnHit(ColorType colorType)
     {
-        if (patterns[0] == colorType)
+        if (pattern[0] == colorType)
         {
-            patterns.Remove(colorType);
-            if (patterns.Count == 0)
+            pattern.Remove(colorType);
+            if (pattern.Count == 0)
             {
                 Death();
             }
