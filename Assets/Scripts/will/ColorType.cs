@@ -2,7 +2,7 @@ using UnityEngine;
 
 public enum ColorType
 {
-    RED,
-    BLUE,
-    YELLOW
+    Red,
+    Blue,
+    Yellow
 }
