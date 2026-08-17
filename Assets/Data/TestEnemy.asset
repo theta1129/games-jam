@@ -12,4 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f7b47c8a0d4611943ad110cccc466b9e, type: 3}
   m_Name: TestEnemy
   m_EditorClassIdentifier: 
-  pattern: 000000000100000002000000
+  pattern: 0000000001000000010000000100000002000000

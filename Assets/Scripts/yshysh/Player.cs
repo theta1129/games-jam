@@ -12,6 +12,14 @@ public class Player : MonoBehaviour
     [SerializeField] private ColorType attackColor = ColorType.Red;
     [SerializeField] private PlayerAttackHitBox attackHitBox;
     [SerializeField] private float attackDuration = 0.2f;
+    [Header("Attack tuning")]
+    [SerializeField] private float comboResetTime = 0.7f;
+    [SerializeField] private float redWindup = 0.5f;
+    [SerializeField] private float redFirstKnockbackForce = 8f;
+    [SerializeField] private float redSecondKnockbackForce = 10f;
+    [SerializeField] private float yellowThrowCooldown = 2f;
+    [SerializeField] private float yellowThrowSpeed = 12f;
+    [SerializeField] private float yellowThrowStunDuration = 1.5f;
     [SerializeField] private float knockbackDuration = 0.15f;
     [SerializeField] private InputActionAsset inputActions;
 
@@ -29,6 +37,9 @@ public class Player : MonoBehaviour
     private Vector2 knockbackVelocity;
     private float attackEndTime;
     private float knockbackEndTime;
+    private float lastAttackTime = -999f;
+    private float nextYellowThrowTime;
+    private int comboStep;
 
     public PlayerStates CurrentState { get; private set; }
     public ColorType CurrentAttackColor => attackColor;
@@ -56,6 +67,8 @@ public class Player : MonoBehaviour
         {
             attackHitBox = GetComponentInChildren<PlayerAttackHitBox>(true);
         }
+
+        attackHitBox?.SetColor(attackColor);
 
         CreateStates();
         ChangeState(PlayerStates.Idle);
@@ -89,6 +102,18 @@ public class Player : MonoBehaviour
     private void Update()
     {
         HandleColorSelection();
+
+        Vector2 mouseDirection = GetMouseAttackDirection();
+        if (mouseDirection.sqrMagnitude > InputThreshold)
+        {
+            facingDirection = mouseDirection.normalized;
+            attackHitBox?.Aim(facingDirection);
+        }
+
+        if (attackColor == ColorType.Yellow && Mouse.current?.rightButton.wasPressedThisFrame == true)
+        {
+            TryStartAttack(true);
+        }
     }
 
     private void FixedUpdate()
@@ -106,10 +131,22 @@ public class Player : MonoBehaviour
 
     private void OnAttackPerformed(InputAction.CallbackContext context)
     {
-        if (CurrentState != PlayerStates.Attack && attackHitBox != null)
+        TryStartAttack(false);
+    }
+
+    private void TryStartAttack(bool rightClick)
+    {
+        if (CurrentState == PlayerStates.Attack || attackHitBox == null) return;
+        if (rightClick && (attackColor != ColorType.Yellow || Time.time < nextYellowThrowTime)) return;
+
+        if (rightClick)
         {
-            ChangeState(PlayerStates.Attack);
+            ThrowYellowArm();
+            nextYellowThrowTime = Time.time + yellowThrowCooldown;
+            return;
         }
+
+        ChangeState(PlayerStates.Attack);
     }
 
     private void CreateStates()
@@ -135,8 +172,7 @@ public class Player : MonoBehaviour
 
     internal void Move()
     {
-        facingDirection = moveInput.normalized;
-        rb.linearVelocity = facingDirection * moveSpeed;
+        rb.linearVelocity = moveInput.normalized * moveSpeed;
     }
 
     internal void StopMovement()
@@ -164,9 +200,33 @@ public class Player : MonoBehaviour
             facingDirection = attackDirection.normalized;
         }
 
-        attackHitBox.transform.localPosition = facingDirection;
-        attackHitBox.Show(attackDuration, attackColor);
-        attackEndTime = Time.time + attackDuration;
+        if (Time.time > lastAttackTime + comboResetTime) comboStep = 0;
+
+        int steps = attackColor == ColorType.Blue ? 3 : 2;
+        int step = comboStep % steps;
+        comboStep++;
+        lastAttackTime = Time.time;
+
+        float windup = attackColor == ColorType.Red ? redWindup : 0.05f;
+        float duration = attackColor == ColorType.Blue ? 0.12f : attackDuration;
+        bool pierce = attackColor == ColorType.Yellow || (attackColor == ColorType.Blue && step == 2);
+        float arc = pierce ? 20f : 130f;
+        float knockback = attackColor == ColorType.Red
+            ? (step == 0 ? redFirstKnockbackForce : redSecondKnockbackForce)
+            : 0f;
+
+        // Alternate the sweep direction for the first two hits. Blue's third hit is a narrow pierce.
+        if (step % 2 == 1) arc = -arc;
+        attackHitBox.Swing(windup, duration, attackColor, facingDirection, arc, knockback, pierce);
+        attackEndTime = Time.time + windup + duration;
+    }
+
+    private void ThrowYellowArm()
+    {
+        Vector2 direction = GetMouseAttackDirection().normalized;
+        if (direction.sqrMagnitude <= InputThreshold) direction = facingDirection;
+        attackHitBox.ThrowMotion(direction);
+        ThrownArmProjectile.Create(transform.position + (Vector3)(direction * 0.9f), direction, yellowThrowSpeed, yellowThrowStunDuration, attackHitBox.WeaponSprite);
     }
 
     private Vector2 GetMouseAttackDirection()
@@ -204,6 +264,8 @@ public class Player : MonoBehaviour
     {
         int colorCount = Enum.GetValues(typeof(ColorType)).Length;
         attackColor = (ColorType)(((int)attackColor + direction + colorCount) % colorCount);
+        comboStep = 0;
+        attackHitBox?.SetColor(attackColor);
     }
 
     private void ResolveInputActions()

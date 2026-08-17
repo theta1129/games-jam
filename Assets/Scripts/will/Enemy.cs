@@ -11,9 +11,22 @@ public class Enemy : MonoBehaviour
 
     [SerializeField] private EnemyData testenemydata;
     [SerializeField] private SpriteRenderer healthPointPrefab;
-    [SerializeField] private float playerKnockbackForce = 8f;
-
+    [Header("Hit reactions")]
+    [SerializeField] private float blueStunDuration = 0.35f;
+    [SerializeField] private float yellowStunDuration = 0.9f;
+    [SerializeField] private float redShakeIntensity = 0.35f;
+    [SerializeField] private float yellowShakeIntensity = 0.2f;
     private List<SpriteRenderer> healthPoints = new();
+    private EnemyMovement movement;
+    private EnemyAttack attack;
+
+    private void Awake()
+    {
+        movement = GetComponent<EnemyMovement>();
+        if (movement == null) movement = gameObject.AddComponent<EnemyMovement>();
+        attack = GetComponent<EnemyAttack>();
+        if (attack == null) attack = gameObject.AddComponent<EnemyAttack>();
+    }
 
     void OnEnable()
     {
@@ -27,21 +40,63 @@ public class Enemy : MonoBehaviour
     }
 
 
-    public void OnHit(ColorType colorType)
+    private void Update()
     {
+        movement.Tick(Player.Instance);
+        attack.Tick(Player.Instance, !movement.IsStunned);
+    }
+
+    public bool OnHit(ColorType colorType, Vector2 sourcePosition, float knockbackForce)
+    {
+        if (pattern == null || pattern.Count == 0) return false;
         if (pattern[0] == colorType)
         {
             pattern.Remove(colorType);
+            if (knockbackForce > 0f) movement.KnockBack(sourcePosition, knockbackForce);
+            PlayHitReaction(colorType);
             UpdateHealth();
             if (pattern.Count == 0)
             {
                 Death();
             }
+            return true;
         }
-        else
+
+        return false;
+    }
+
+    public void Stun(float duration) => movement.Stun(duration);
+
+    private void PlayHitReaction(ColorType colorType)
+    {
+        switch (colorType)
         {
-            Player.Instance?.KnockBack(transform.position, playerKnockbackForce);
+            case ColorType.Red:
+                ShakeCamera(redShakeIntensity);
+                HitStop(0.08f);
+                break;
+            case ColorType.Blue:
+                Stun(blueStunDuration);
+                HitStop(0.06f);
+                break;
+            case ColorType.Yellow:
+                Stun(yellowStunDuration);
+                ShakeCamera(yellowShakeIntensity);
+                break;
         }
+    }
+
+    private static void ShakeCamera(float intensity)
+    {
+        Camera gameCamera = Camera.main;
+        if (gameCamera == null) return;
+        CameraShake shake = gameCamera.GetComponent<CameraShake>() ?? gameCamera.gameObject.AddComponent<CameraShake>();
+        shake.StartCoroutine(shake.Shake(0.18f, intensity));
+    }
+
+    private static void HitStop(float duration)
+    {
+        if (GameManager.instance != null) Stop.Pause(duration);
     }
 
     private IEnumerator Attack()
