@@ -15,6 +15,7 @@ public class Enemy : MonoBehaviour
     [SerializeField] private float blueStunDuration = 0.35f;
     [SerializeField] private float yellowStunDuration = 0.9f;
     [SerializeField] private float redShakeIntensity = 0.35f;
+    [SerializeField] private float blueShakeIntensity = 0.16f;
     [SerializeField] private float yellowShakeIntensity = 0.2f;
     private List<SpriteRenderer> healthPoints = new();
     private EnemyMovement movement;
@@ -77,11 +78,13 @@ public class Enemy : MonoBehaviour
                 break;
             case ColorType.Blue:
                 Stun(blueStunDuration);
+                ShakeCamera(blueShakeIntensity);
                 HitStop(0.06f);
                 break;
             case ColorType.Yellow:
                 Stun(yellowStunDuration);
                 ShakeCamera(yellowShakeIntensity);
+                HitStop(0.06f);
                 break;
         }
     }
@@ -91,7 +94,7 @@ public class Enemy : MonoBehaviour
         Camera gameCamera = Camera.main;
         if (gameCamera == null) return;
         CameraShake shake = gameCamera.GetComponent<CameraShake>() ?? gameCamera.gameObject.AddComponent<CameraShake>();
-        shake.StartCoroutine(shake.Shake(0.18f, intensity));
+        shake.ShakeScreen(0.18f, intensity);
     }
 
     private static void HitStop(float duration)

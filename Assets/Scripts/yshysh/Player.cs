@@ -20,7 +20,11 @@ public class Player : MonoBehaviour
     [SerializeField] private float yellowThrowCooldown = 2f;
     [SerializeField] private float yellowThrowSpeed = 12f;
     [SerializeField] private float yellowThrowStunDuration = 1.5f;
+    [SerializeField] private float yellowThrowWindup = 0.22f;
     [SerializeField] private float knockbackDuration = 0.15f;
+    [Header("Player hit feedback")]
+    [SerializeField] private float receivedHitStop = 0.06f;
+    [SerializeField] private float receivedHitShakeIntensity = 0.25f;
     [SerializeField] private InputActionAsset inputActions;
 
     private const string MoveActionName = "Player/Move";
@@ -40,6 +44,7 @@ public class Player : MonoBehaviour
     private float lastAttackTime = -999f;
     private float nextYellowThrowTime;
     private int comboStep;
+    private bool isThrowingYellowArm;
 
     public PlayerStates CurrentState { get; private set; }
     public ColorType CurrentAttackColor => attackColor;
@@ -114,6 +119,13 @@ public class Player : MonoBehaviour
         {
             TryStartAttack(true);
         }
+
+        // A completed first swing deliberately stays at its follow-through until the combo expires.
+        if (Time.time > lastAttackTime + comboResetTime)
+        {
+            comboStep = 0;
+            attackHitBox?.ReleaseComboPose(facingDirection);
+        }
     }
 
     private void FixedUpdate()
@@ -136,13 +148,12 @@ public class Player : MonoBehaviour
 
     private void TryStartAttack(bool rightClick)
     {
-        if (CurrentState == PlayerStates.Attack || attackHitBox == null) return;
+        if (CurrentState == PlayerStates.Attack || isThrowingYellowArm || attackHitBox == null) return;
         if (rightClick && (attackColor != ColorType.Yellow || Time.time < nextYellowThrowTime)) return;
 
         if (rightClick)
         {
-            ThrowYellowArm();
-            nextYellowThrowTime = Time.time + yellowThrowCooldown;
+            StartCoroutine(ThrowYellowArmRoutine());
             return;
         }
 
@@ -192,6 +203,19 @@ public class Player : MonoBehaviour
         knockbackEndTime = Time.time + knockbackDuration;
     }
 
+    public void ReceiveHit(Vector2 sourcePosition, float force)
+    {
+        KnockBack(sourcePosition, force);
+        if (GameManager.instance != null) Stop.Pause(receivedHitStop);
+
+        Camera gameCamera = Camera.main;
+        if (gameCamera != null)
+        {
+            CameraShake shake = gameCamera.GetComponent<CameraShake>() ?? gameCamera.gameObject.AddComponent<CameraShake>();
+            shake.ShakeScreen(0.14f, receivedHitShakeIntensity);
+        }
+    }
+
     internal void PerformAttack()
     {
         Vector2 attackDirection = GetMouseAttackDirection();
@@ -215,18 +239,24 @@ public class Player : MonoBehaviour
             ? (step == 0 ? redFirstKnockbackForce : redSecondKnockbackForce)
             : 0f;
 
-        // Alternate the sweep direction for the first two hits. Blue's third hit is a narrow pierce.
-        if (step % 2 == 1) arc = -arc;
-        attackHitBox.Swing(windup, duration, attackColor, facingDirection, arc, knockback, pierce);
+        // Hit one goes from the resting pose into a follow-through. Hit two uses that held
+        // follow-through as its start and swings the weapon back to its original pose.
+        bool swingBackToRest = step % 2 == 1;
+        attackHitBox.Swing(windup, duration, attackColor, facingDirection, arc, knockback, pierce, swingBackToRest);
         attackEndTime = Time.time + windup + duration;
     }
 
-    private void ThrowYellowArm()
+    private System.Collections.IEnumerator ThrowYellowArmRoutine()
     {
         Vector2 direction = GetMouseAttackDirection().normalized;
         if (direction.sqrMagnitude <= InputThreshold) direction = facingDirection;
-        attackHitBox.ThrowMotion(direction);
+        isThrowingYellowArm = true;
+        attackHitBox.ReleaseComboPose(direction);
+        attackHitBox.ThrowMotion(direction, yellowThrowWindup);
+        yield return new WaitForSeconds(yellowThrowWindup);
         ThrownArmProjectile.Create(transform.position + (Vector3)(direction * 0.9f), direction, yellowThrowSpeed, yellowThrowStunDuration, attackHitBox.WeaponSprite);
+        nextYellowThrowTime = Time.time + yellowThrowCooldown;
+        isThrowingYellowArm = false;
     }
 
     private Vector2 GetMouseAttackDirection()

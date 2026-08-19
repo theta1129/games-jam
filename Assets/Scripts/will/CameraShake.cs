@@ -5,6 +5,7 @@ public class CameraShake : MonoBehaviour
 {
     public bool started = false;
     public AnimationCurve animationCurve;
+    private Coroutine shakeRoutine;
 
     private void Awake()
     {
@@ -38,5 +39,18 @@ public class CameraShake : MonoBehaviour
             yield return null;
         }
         transform.position = startPos;
+    }
+
+    // Use this instead of starting Shake directly so a new impact replaces an older shake cleanly.
+    public void ShakeScreen(float duration = 0.18f, float intensity = 0.25f)
+    {
+        if (shakeRoutine != null) StopCoroutine(shakeRoutine);
+        shakeRoutine = StartCoroutine(ShakeScreenRoutine(duration, intensity));
+    }
+
+    private IEnumerator ShakeScreenRoutine(float duration, float intensity)
+    {
+        yield return Shake(duration, intensity);
+        shakeRoutine = null;
     }
 }

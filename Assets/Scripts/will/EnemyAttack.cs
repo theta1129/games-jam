@@ -19,7 +19,7 @@ public sealed class EnemyAttack : MonoBehaviour
             Player target = hit.GetComponentInParent<Player>();
             if (target == player)
             {
-                target.KnockBack(transform.position, knockbackForce);
+                target.ReceiveHit(transform.position, knockbackForce);
                 nextAttackTime = Time.time + attackCooldown;
                 break;
             }

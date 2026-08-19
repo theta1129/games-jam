@@ -8,7 +8,7 @@ public class PlayerAttackHitBox : MonoBehaviour
 {
     [SerializeField] private Vector2 size = new(1.25f, 0.45f);
     [SerializeField] private float armReach = 0.85f;
-    [Header("Weapon sprites (vertical, centred artwork)")]
+    [Header("Weapon sprites (horizontal, centred artwork)")]
     [SerializeField] private Sprite redWeaponSprite;
     [SerializeField] private Sprite blueWeaponSprite;
     [SerializeField] private Sprite yellowWeaponSprite;
@@ -23,6 +23,7 @@ public class PlayerAttackHitBox : MonoBehaviour
     private float activeReach;
     private Sprite activeWeaponSprite;
     private Sprite centeredWeaponSprite;
+    private bool holdingComboPose;
 
     public bool IsSwinging => swingRoutine != null;
     public Sprite WeaponSprite => activeWeaponSprite;
@@ -37,7 +38,7 @@ public class PlayerAttackHitBox : MonoBehaviour
 
     public void Aim(Vector2 direction)
     {
-        if (!IsSwinging && throwRoutine == null && direction.sqrMagnitude > 0.0001f) SetArmPose(direction.normalized);
+        if (!IsSwinging && throwRoutine == null && !holdingComboPose && direction.sqrMagnitude > 0.0001f) SetArmPose(direction.normalized);
     }
 
     public void SetColor(ColorType colorType)
@@ -53,7 +54,7 @@ public class PlayerAttackHitBox : MonoBehaviour
         }
     }
 
-    public void Swing(float windup, float duration, ColorType colorType, Vector2 direction, float arc, float knockbackForce, bool pierce)
+    public void Swing(float windup, float duration, ColorType colorType, Vector2 direction, float arc, float knockbackForce, bool pierce, bool swingBackToRest)
     {
         CacheComponents();
         if (swingRoutine != null) StopCoroutine(swingRoutine);
@@ -61,6 +62,7 @@ public class PlayerAttackHitBox : MonoBehaviour
         SetColor(colorType);
         activeKnockbackForce = knockbackForce;
         activeReach = pierce ? armReach * 1.7f : armReach;
+        holdingComboPose = false;
         hitEnemies.Clear();
         hitCollider.enabled = false;
         if (spriteRenderer != null)
@@ -68,7 +70,14 @@ public class PlayerAttackHitBox : MonoBehaviour
             spriteRenderer.enabled = true;
         }
 
-        swingRoutine = StartCoroutine(SwingRoutine(windup, duration, direction.normalized, arc, knockbackForce, pierce));
+        swingRoutine = StartCoroutine(SwingRoutine(windup, duration, direction.normalized, arc, knockbackForce, pierce, swingBackToRest));
+    }
+
+    public void ReleaseComboPose(Vector2 direction)
+    {
+        holdingComboPose = false;
+        activeReach = armReach;
+        if (!IsSwinging && throwRoutine == null && direction.sqrMagnitude > 0.0001f) SetArmPose(direction.normalized);
     }
 
     // A non-damaging follow-through used when the yellow weapon is thrown.
@@ -98,18 +107,19 @@ public class PlayerAttackHitBox : MonoBehaviour
         throwRoutine = null;
     }
 
-    private IEnumerator SwingRoutine(float windup, float duration, Vector2 direction, float arc, float knockbackForce, bool pierce)
+    private IEnumerator SwingRoutine(float windup, float duration, Vector2 direction, float arc, float knockbackForce, bool pierce, bool swingBackToRest)
     {
         // Draw the arm back behind the player during the ready phase, then release it into the swing.
         float centerAngle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-        float startAngle = centerAngle - arc * 0.5f;
+        float followThroughAngle = centerAngle + arc;
+        float startAngle = swingBackToRest ? followThroughAngle : centerAngle;
+        float endAngle = swingBackToRest ? centerAngle : followThroughAngle;
         float windupElapsed = 0f;
         while (windupElapsed < windup)
         {
             windupElapsed += Time.deltaTime;
             float progress = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(windupElapsed / windup));
-            // Wind up along the same circular path, but in the opposite direction to the release swing.
-            float angle = Mathf.Lerp(centerAngle + arc * 0.5f, startAngle, progress);
+            float angle = Mathf.Lerp(endAngle, startAngle, progress);
             SetArmPose(AngleToDirection(angle));
             yield return null;
         }
@@ -120,22 +130,26 @@ public class PlayerAttackHitBox : MonoBehaviour
         {
             elapsed += Time.deltaTime;
             float progress = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
-            float angle = Mathf.Lerp(startAngle, startAngle + arc, progress);
+            float angle = Mathf.Lerp(startAngle, endAngle, progress);
             SetArmPose(AngleToDirection(angle));
             yield return null;
         }
 
         hitCollider.enabled = false;
         swingRoutine = null;
-        activeReach = armReach;
-        SetArmPose(direction);
+        holdingComboPose = !swingBackToRest;
+        if (!holdingComboPose)
+        {
+            activeReach = armReach;
+            SetArmPose(direction);
+        }
     }
 
     private void CacheComponents()
     {
         hitCollider ??= GetComponent<BoxCollider2D>();
         hitCollider.isTrigger = true;
-        hitCollider.size = activeWeaponSprite != null ? new Vector2(size.y, size.x) : size;
+        hitCollider.size = size;
         spriteRenderer ??= GetComponent<SpriteRenderer>();
         if (spriteRenderer != null)
         {
@@ -164,8 +178,8 @@ public class PlayerAttackHitBox : MonoBehaviour
         float targetReach = reach >= 0f ? reach : (activeReach > 0f ? activeReach : armReach);
         transform.localPosition = direction * targetReach;
         float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-        // Weapon art is authored upright/vertical, while the hitbox needs to face the attack direction.
-        transform.localRotation = Quaternion.Euler(0f, 0f, angle + (activeWeaponSprite != null ? -90f : 0f));
+        // Weapon art is authored horizontal with its pivot in the centre.
+        transform.localRotation = Quaternion.Euler(0f, 0f, angle);
     }
 
     private void OnTriggerEnter2D(Collider2D other) => TryHit(other);
