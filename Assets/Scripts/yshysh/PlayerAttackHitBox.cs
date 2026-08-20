@@ -6,10 +6,16 @@ using UnityEngine;
 [RequireComponent(typeof(BoxCollider2D))]
 public class PlayerAttackHitBox : MonoBehaviour
 {
+    private static Sprite fallbackHitboxSprite;
+
     [SerializeField] private Vector2 size = new(1.25f, 0.45f);
     [SerializeField] private float armReach = 0.85f;
     [SerializeField] private float afterimageLifetime = 0.12f;
     [SerializeField] private Color afterimageColor = new(1f, 1f, 1f, 0.32f);
+    [Header("Attack trail")]
+    [SerializeField] private float trailTime = 0.12f;
+    [SerializeField] private float trailStartWidth = 0.18f;
+    [SerializeField] private float trailEndWidth = 0.02f;
     [Header("Weapon sprites (vertical artwork)")]
     [SerializeField] private Sprite redWeaponSprite;
     [SerializeField] private Sprite blueWeaponSprite;
@@ -19,6 +25,8 @@ public class PlayerAttackHitBox : MonoBehaviour
     private BoxCollider2D hitCollider;
     private SpriteRenderer spriteRenderer;
     private SpriteRenderer weaponRenderer;
+    private TrailRenderer weaponTrail;
+    private Material trailMaterial;
     private Coroutine swingRoutine;
     private Coroutine throwRoutine;
     private ColorType activeColor;
@@ -57,11 +65,12 @@ public class PlayerAttackHitBox : MonoBehaviour
         }
     }
 
-    public void Swing(float windup, float duration, ColorType colorType, Vector2 direction, float arc, float knockbackForce, bool pierce, bool swingBackToRest)
+    public void Swing(float windup, float duration, ColorType colorType, Vector2 direction, float arc, float knockbackForce, bool pierce, bool swingBackToRest, bool recoverAfterSwing = false, float recoverDuration = 0.14f)
     {
         CacheComponents();
         if (swingRoutine != null) StopCoroutine(swingRoutine);
         if (recoveryRoutine != null) StopCoroutine(recoveryRoutine);
+        SetTrailActive(false);
 
         SetColor(colorType);
         activeKnockbackForce = knockbackForce;
@@ -73,7 +82,7 @@ public class PlayerAttackHitBox : MonoBehaviour
         if (spriteRenderer != null) spriteRenderer.enabled = !HasWeaponSprite;
         if (weaponRenderer != null) weaponRenderer.enabled = HasWeaponSprite;
 
-        swingRoutine = StartCoroutine(SwingRoutine(windup, duration, direction.normalized, arc, knockbackForce, pierce, swingBackToRest));
+        swingRoutine = StartCoroutine(SwingRoutine(windup, duration, direction.normalized, arc, knockbackForce, pierce, swingBackToRest, recoverAfterSwing, recoverDuration));
     }
 
     public void Thrust(float windup, float duration, ColorType colorType, Vector2 direction, float knockbackForce, bool pierce, float thrustReach, float pullbackDistance)
@@ -81,6 +90,7 @@ public class PlayerAttackHitBox : MonoBehaviour
         CacheComponents();
         if (swingRoutine != null) StopCoroutine(swingRoutine);
         if (recoveryRoutine != null) StopCoroutine(recoveryRoutine);
+        SetTrailActive(false);
 
         SetColor(colorType);
         activeKnockbackForce = knockbackForce;
@@ -98,6 +108,7 @@ public class PlayerAttackHitBox : MonoBehaviour
     public void ReleaseComboPose(Vector2 direction)
     {
         if (recoveryRoutine != null) StopCoroutine(recoveryRoutine);
+        SetTrailActive(false);
         holdingComboPose = false;
         activeReach = armReach;
         if (!IsSwinging && throwRoutine == null && direction.sqrMagnitude > 0.0001f) SetArmPose(direction.normalized);
@@ -113,32 +124,55 @@ public class PlayerAttackHitBox : MonoBehaviour
     // A non-damaging follow-through used when the yellow weapon is thrown.
     public void ThrowMotion(Vector2 direction, float duration = 0.22f)
     {
+        CacheComponents();
         if (recoveryRoutine != null) StopCoroutine(recoveryRoutine);
         if (throwRoutine != null) StopCoroutine(throwRoutine);
+        SetTrailActive(false);
         throwRoutine = StartCoroutine(ThrowRoutine(direction.normalized, duration));
     }
 
     private IEnumerator ThrowRoutine(Vector2 direction, float duration)
     {
-        float centerAngle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+        if (direction.sqrMagnitude <= 0.0001f) direction = Vector2.right;
+
+        float safeDuration = Mathf.Max(0.01f, duration);
+        float pullPhase = 0.58f;
+        float pulledReach = -armReach * 0.35f;
+        float releaseReach = armReach * 1.85f;
         float elapsed = 0f;
-        while (elapsed < duration)
+        bool trailStarted = false;
+        SetArmPose(direction, armReach);
+
+        while (elapsed < safeDuration)
         {
             elapsed += Time.deltaTime;
-            float progress = Mathf.Clamp01(elapsed / duration);
-            // Pull the held weapon around one side, then whip it forward as the separate weapon leaves.
-            float angle = progress < 0.4f
-                ? Mathf.Lerp(centerAngle, centerAngle + 75f, progress / 0.4f)
-                : Mathf.Lerp(centerAngle + 75f, centerAngle - 25f, (progress - 0.4f) / 0.6f);
-            SetArmPose(AngleToDirection(angle));
+            float progress = Mathf.Clamp01(elapsed / safeDuration);
+            if (progress < pullPhase)
+            {
+                float pullProgress = Mathf.SmoothStep(0f, 1f, progress / pullPhase);
+                SetArmPose(direction, Mathf.Lerp(armReach, pulledReach, pullProgress));
+            }
+            else
+            {
+                if (!trailStarted)
+                {
+                    SetTrailActive(true);
+                    trailStarted = true;
+                }
+
+                float throwProgress = Mathf.SmoothStep(0f, 1f, (progress - pullPhase) / (1f - pullPhase));
+                SetArmPose(direction, Mathf.Lerp(pulledReach, releaseReach, throwProgress));
+            }
+
             yield return null;
         }
 
+        SetTrailActive(false);
         SetArmPose(direction);
         throwRoutine = null;
     }
 
-    private IEnumerator SwingRoutine(float windup, float duration, Vector2 direction, float arc, float knockbackForce, bool pierce, bool swingBackToRest)
+    private IEnumerator SwingRoutine(float windup, float duration, Vector2 direction, float arc, float knockbackForce, bool pierce, bool swingBackToRest, bool recoverAfterSwing, float recoverDuration)
     {
         // Draw the arm back behind the player during the ready phase, then release it into the swing.
         float centerAngle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
@@ -159,6 +193,7 @@ public class PlayerAttackHitBox : MonoBehaviour
 
         float elapsed = 0f;
         SpawnSwingAfterimages(startAngle, centerAngle, endAngle, duration);
+        SetTrailActive(true);
         hitCollider.enabled = true;
         while (elapsed < duration)
         {
@@ -170,6 +205,16 @@ public class PlayerAttackHitBox : MonoBehaviour
         }
 
         hitCollider.enabled = false;
+        SetTrailActive(false);
+        if (recoverAfterSwing)
+        {
+            holdingComboPose = false;
+            activeReach = armReach;
+            yield return RecoverRoutine(direction, Mathf.Max(0.01f, recoverDuration));
+            swingRoutine = null;
+            yield break;
+        }
+
         swingRoutine = null;
         holdingComboPose = !swingBackToRest;
         if (!holdingComboPose)
@@ -196,6 +241,9 @@ public class PlayerAttackHitBox : MonoBehaviour
             weaponRenderer.sortingOrder = 10;
             weaponRenderer.enabled = true;
             FitWeaponVisual();
+            EnsureWeaponTrail();
+            UpdateTrailColor();
+            PositionTrailAtWeaponTip();
             return;
         }
 
@@ -209,6 +257,10 @@ public class PlayerAttackHitBox : MonoBehaviour
             spriteRenderer.sortingOrder = 10;
             spriteRenderer.enabled = true;
         }
+
+        EnsureWeaponTrail();
+        UpdateTrailColor();
+        PositionTrailAtWeaponTip();
     }
 
     private IEnumerator ThrustRoutine(float windup, float duration, Vector2 direction, float thrustReach, float pullbackDistance)
@@ -227,6 +279,7 @@ public class PlayerAttackHitBox : MonoBehaviour
 
         float elapsed = 0f;
         SpawnThrustAfterimage(direction, thrustReach, duration);
+        SetTrailActive(true);
         hitCollider.enabled = true;
         while (elapsed < duration)
         {
@@ -237,6 +290,7 @@ public class PlayerAttackHitBox : MonoBehaviour
         }
 
         hitCollider.enabled = false;
+        SetTrailActive(false);
         swingRoutine = null;
         activeReach = thrustReach;
         holdingComboPose = true;
@@ -287,6 +341,90 @@ public class PlayerAttackHitBox : MonoBehaviour
         visual.transform.SetParent(transform, false);
         visual.layer = gameObject.layer;
         weaponRenderer = visual.AddComponent<SpriteRenderer>();
+    }
+
+    private void EnsureWeaponTrail()
+    {
+        if (weaponTrail != null) return;
+
+        GameObject trail = new("WeaponTrail");
+        trail.transform.SetParent(transform, false);
+        trail.layer = gameObject.layer;
+        weaponTrail = trail.AddComponent<TrailRenderer>();
+        weaponTrail.time = trailTime;
+        weaponTrail.minVertexDistance = 0.015f;
+        weaponTrail.startWidth = trailStartWidth;
+        weaponTrail.endWidth = trailEndWidth;
+        weaponTrail.numCapVertices = 2;
+        weaponTrail.numCornerVertices = 2;
+        weaponTrail.autodestruct = false;
+        weaponTrail.emitting = false;
+        weaponTrail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        weaponTrail.receiveShadows = false;
+        weaponTrail.sortingOrder = 8;
+
+        Shader shader = Shader.Find("Sprites/Default") ?? Shader.Find("Default");
+        if (shader != null)
+        {
+            trailMaterial = new Material(shader) { name = "Runtime Weapon Trail" };
+            weaponTrail.material = trailMaterial;
+        }
+    }
+
+    private void PositionTrailAtWeaponTip()
+    {
+        if (weaponTrail == null) return;
+
+        weaponTrail.transform.localPosition = HasWeaponSprite
+            ? Vector3.up * (size.x * 0.52f)
+            : Vector3.right * (size.x * 0.52f);
+        weaponTrail.transform.localRotation = Quaternion.identity;
+        weaponTrail.transform.localScale = Vector3.one;
+    }
+
+    private void SetTrailActive(bool active)
+    {
+        EnsureWeaponTrail();
+        if (weaponTrail == null) return;
+
+        PositionTrailAtWeaponTip();
+        UpdateTrailColor();
+        if (active)
+        {
+            weaponTrail.Clear();
+        }
+
+        weaponTrail.emitting = active;
+    }
+
+    private void UpdateTrailColor()
+    {
+        if (weaponTrail == null) return;
+
+        Color color = GetDisplayColor(activeColor);
+        color.a = 0.72f;
+        Color softColor = Color.Lerp(color, Color.white, 0.35f);
+        softColor.a = 0.15f;
+
+        Gradient gradient = new();
+        gradient.SetKeys(
+            new[]
+            {
+                new GradientColorKey(Color.white, 0f),
+                new GradientColorKey(color, 0.45f),
+                new GradientColorKey(softColor, 1f),
+            },
+            new[]
+            {
+                new GradientAlphaKey(0.95f, 0f),
+                new GradientAlphaKey(0.48f, 0.55f),
+                new GradientAlphaKey(0f, 1f),
+            });
+
+        weaponTrail.time = trailTime;
+        weaponTrail.startWidth = trailStartWidth;
+        weaponTrail.endWidth = trailEndWidth;
+        weaponTrail.colorGradient = gradient;
     }
 
     private void FitWeaponVisual()
@@ -403,9 +541,19 @@ public class PlayerAttackHitBox : MonoBehaviour
 
     private void EnsureSprite()
     {
-        if (spriteRenderer.sprite != null) return;
-        Texture2D texture = Texture2D.whiteTexture;
-        spriteRenderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), texture.width);
+        if (fallbackHitboxSprite == null)
+        {
+            Texture2D texture = Texture2D.whiteTexture;
+            fallbackHitboxSprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f),
+                texture.width,
+                0,
+                SpriteMeshType.FullRect);
+        }
+
+        spriteRenderer.sprite = fallbackHitboxSprite;
     }
 
     private static Vector2 AngleToDirection(float angle)

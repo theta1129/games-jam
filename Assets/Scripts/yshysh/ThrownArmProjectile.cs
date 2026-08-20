@@ -3,6 +3,7 @@ using UnityEngine;
 public sealed class ThrownArmProjectile : MonoBehaviour
 {
     private static readonly Vector2 VisualSize = new(0.45f, 1.25f);
+    private static Sprite fallbackProjectileSprite;
 
     private Vector2 direction;
     private float speed;
@@ -48,13 +49,13 @@ public sealed class ThrownArmProjectile : MonoBehaviour
         else
         {
             SpriteRenderer renderer = gameObject.AddComponent<SpriteRenderer>();
-            Texture2D texture = Texture2D.whiteTexture;
-            renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), texture.width);
+            renderer.sprite = GetFallbackProjectileSprite();
             renderer.drawMode = SpriteDrawMode.Sliced;
             renderer.size = collider.size;
             renderer.color = new Color(1f, 0.85f, 0.1f, 0.75f);
             renderer.sortingOrder = 10;
         }
+
         transform.up = direction;
     }
 
@@ -74,6 +75,23 @@ public sealed class ThrownArmProjectile : MonoBehaviour
         visualTransform.localRotation = Quaternion.identity;
         visualTransform.localScale = Vector3.one * visualScale;
         visualTransform.localPosition = -(Vector3)(weaponSprite.bounds.center * visualScale);
+    }
+
+    private static Sprite GetFallbackProjectileSprite()
+    {
+        if (fallbackProjectileSprite == null)
+        {
+            Texture2D texture = Texture2D.whiteTexture;
+            fallbackProjectileSprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f),
+                texture.width,
+                0,
+                SpriteMeshType.FullRect);
+        }
+
+        return fallbackProjectileSprite;
     }
 
     private void Update()

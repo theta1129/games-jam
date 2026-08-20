@@ -8,12 +8,12 @@ public class Player : MonoBehaviour
 {
     public static Player Instance { get; private set; }
 
-    [SerializeField] private float moveSpeed = 5f;
+    [SerializeField] private float moveSpeed = 7f;
     [SerializeField] private ColorType attackColor = ColorType.Red;
     [SerializeField] private PlayerAttackHitBox attackHitBox;
     [SerializeField] private float batSwingDuration = 0.2f;
     [SerializeField] private float swordSwingDuration = 1f / 60f;
-    [SerializeField] private float swordDashThrustDuration = 0.12f;
+    [SerializeField] private float swordDashThrustDuration = 0.16f;
     [SerializeField] private float spearPullbackDuration = 0.08f;
     [SerializeField] private float spearThrustDuration = 0.1f;
     [Header("Attack tuning")]
@@ -23,8 +23,12 @@ public class Player : MonoBehaviour
     [SerializeField] private float blueSwingArc = 130f;
     [SerializeField] private float redFirstKnockbackForce = 24f;
     [SerializeField] private float redSecondKnockbackForce = 30f;
-    [SerializeField] private float blueDashSpeed = 13f;
-    [SerializeField] private float blueDashReach = 1.9f;
+    [SerializeField] private float redStepSpeed = 3.4f;
+    [SerializeField] private float blueStepSpeed = 4.4f;
+    [SerializeField] private float yellowStepSpeed = 3.8f;
+    [SerializeField] private float attackStepDuration = 0.08f;
+    [SerializeField] private float blueDashSpeed = 18f;
+    [SerializeField] private float blueDashReach = 2.35f;
     [SerializeField] private float spearThrustReach = 1.9f;
     [SerializeField] private float spearPullbackDistance = 0.35f;
     [SerializeField] private float yellowThrowCooldown = 2f;
@@ -248,7 +252,10 @@ public class Player : MonoBehaviour
     {
         Damage(1);
         KnockBack(sourcePosition, force);
-        if (GameManager.instance != null) Stop.Pause(receivedHitStop);
+        Stop.Pause(receivedHitStop);
+        HitBurstVfx.Spawn(transform.position, attackColor);
+        HitFlash flash = GetComponent<HitFlash>() ?? gameObject.AddComponent<HitFlash>();
+        flash.Flash(Color.white, 0.09f);
 
         Camera gameCamera = Camera.main;
         if (gameCamera != null)
@@ -281,22 +288,30 @@ public class Player : MonoBehaviour
         switch (attackColor)
         {
             case ColorType.Blue when step == 2:
+                ShakeCamera(0.08f, 0.08f);
                 StartAttackDash(facingDirection, blueDashSpeed, swordDashThrustDuration);
                 attackHitBox.Thrust(0f, swordDashThrustDuration, attackColor, facingDirection, 0f, true, blueDashReach, 0f);
                 attackEndTime = Time.time + swordDashThrustDuration;
                 break;
             case ColorType.Blue:
+                ShakeCamera(0.055f, 0.045f);
+                StartAttackDash(facingDirection, blueStepSpeed, attackStepDuration);
                 attackHitBox.Swing(0f, swordSwingDuration, attackColor, facingDirection, blueSwingArc, 0f, false, step % 2 == 1);
                 attackEndTime = Time.time + swordSwingDuration;
                 break;
             case ColorType.Yellow:
+                ShakeCamera(0.065f, 0.06f);
+                StartAttackDash(facingDirection, yellowStepSpeed, attackStepDuration);
                 attackHitBox.Thrust(spearPullbackDuration, spearThrustDuration, attackColor, facingDirection, 0f, false, spearThrustReach, spearPullbackDistance);
                 attackEndTime = Time.time + spearPullbackDuration + spearThrustDuration;
                 break;
             default:
+                ShakeCamera(0.09f, 0.1f);
+                StartAttackDash(facingDirection, redStepSpeed, attackStepDuration);
                 float knockback = step == 0 ? redFirstKnockbackForce : redSecondKnockbackForce;
-                attackHitBox.Swing(0f, batSwingDuration, attackColor, facingDirection, redSwingArc, knockback, false, step % 2 == 1);
-                attackEndTime = Time.time + batSwingDuration;
+                bool isSecondRedSwing = step % 2 == 1;
+                attackHitBox.Swing(0f, batSwingDuration, attackColor, facingDirection, redSwingArc, knockback, false, isSecondRedSwing, isSecondRedSwing, weaponRecoverDuration);
+                attackEndTime = Time.time + batSwingDuration + (isSecondRedSwing ? weaponRecoverDuration : 0f);
                 break;
         }
     }
@@ -332,6 +347,8 @@ public class Player : MonoBehaviour
         if (direction.sqrMagnitude <= InputThreshold) direction = facingDirection;
         isThrowingYellowArm = true;
         attackHitBox.ReleaseComboPose(direction);
+        ShakeCamera(0.075f, 0.07f);
+        StartAttackDash(direction, yellowStepSpeed, attackStepDuration);
         attackHitBox.ThrowMotion(direction, yellowThrowWindup);
         yield return new WaitForSeconds(yellowThrowWindup);
         ThrownArmProjectile.Create(transform.position + (Vector3)(direction * 0.9f), direction, yellowThrowSpeed, yellowThrowStunDuration, attackHitBox.WeaponSprite);
@@ -390,6 +407,15 @@ public class Player : MonoBehaviour
         comboStep = 0;
         attackHitBox?.SetColor(attackColor);
         attackHitBox?.RecoverToRestPose(facingDirection, weaponRecoverDuration * 0.5f);
+    }
+
+    private static void ShakeCamera(float duration, float intensity)
+    {
+        Camera gameCamera = Camera.main;
+        if (gameCamera == null) return;
+
+        CameraShake shake = gameCamera.GetComponent<CameraShake>() ?? gameCamera.gameObject.AddComponent<CameraShake>();
+        shake.ShakeScreen(duration, intensity);
     }
 
     private void OnGUI()

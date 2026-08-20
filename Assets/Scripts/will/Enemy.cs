@@ -54,6 +54,9 @@ public class Enemy : MonoBehaviour
         {
             pattern.Remove(colorType);
             if (knockbackForce > 0f) movement.KnockBack(sourcePosition, knockbackForce);
+            HitBurstVfx.Spawn(transform.position, colorType);
+            HitFlash flash = GetComponent<HitFlash>() ?? gameObject.AddComponent<HitFlash>();
+            flash.Flash(Color.white, 0.08f);
             PlayHitReaction(colorType);
             UpdateHealth();
             if (pattern.Count == 0)
@@ -99,7 +102,7 @@ public class Enemy : MonoBehaviour
 
     private static void HitStop(float duration)
     {
-        if (GameManager.instance != null) Stop.Pause(duration);
+        Stop.Pause(duration);
     }
 
     private IEnumerator Attack()

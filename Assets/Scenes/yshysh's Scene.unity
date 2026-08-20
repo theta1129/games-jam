@@ -531,6 +531,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   size: {x: 1.25, y: 0.45}
   armReach: 0.85
+  afterimageLifetime: 0.12
+  afterimageColor: {r: 1, g: 1, b: 1, a: 0.32}
+  trailTime: 0.12
+  trailStartWidth: 0.18
+  trailEndWidth: 0.02
   redWeaponSprite: {fileID: 1098179606456428539, guid: fc0b7e08e0b126145b86c40d484cd8d5, type: 3}
   blueWeaponSprite: {fileID: -5557420877203330147, guid: fc0b7e08e0b126145b86c40d484cd8d5, type: 3}
   yellowWeaponSprite: {fileID: -7888296697152109952, guid: fc0b7e08e0b126145b86c40d484cd8d5, type: 3}
@@ -666,12 +671,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e6e4fab31e28ca947885dbd2ee6cf35e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveSpeed: 5
+  moveSpeed: 7
   attackColor: 0
   attackHitBox: {fileID: 1319747734}
   batSwingDuration: 0.2
   swordSwingDuration: 0.016666668
-  swordDashThrustDuration: 0.12
+  swordDashThrustDuration: 0.16
   spearPullbackDuration: 0.08
   spearThrustDuration: 0.1
   comboResetTime: 0.45
@@ -680,8 +685,12 @@ MonoBehaviour:
   blueSwingArc: 130
   redFirstKnockbackForce: 24
   redSecondKnockbackForce: 30
-  blueDashSpeed: 13
-  blueDashReach: 1.9
+  redStepSpeed: 3.4
+  blueStepSpeed: 4.4
+  yellowStepSpeed: 3.8
+  attackStepDuration: 0.08
+  blueDashSpeed: 18
+  blueDashReach: 2.35
   spearThrustReach: 1.9
   spearPullbackDistance: 0.35
   yellowThrowCooldown: 2
