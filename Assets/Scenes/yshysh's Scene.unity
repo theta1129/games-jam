@@ -530,6 +530,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   size: {x: 1.25, y: 0.45}
+  armReach: 0.85
+  redWeaponSprite: {fileID: 1098179606456428539, guid: fc0b7e08e0b126145b86c40d484cd8d5, type: 3}
+  blueWeaponSprite: {fileID: -5557420877203330147, guid: fc0b7e08e0b126145b86c40d484cd8d5, type: 3}
+  yellowWeaponSprite: {fileID: -7888296697152109952, guid: fc0b7e08e0b126145b86c40d484cd8d5, type: 3}
 --- !u!61 &1319747735
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -665,8 +669,36 @@ MonoBehaviour:
   moveSpeed: 5
   attackColor: 0
   attackHitBox: {fileID: 1319747734}
-  attackDuration: 0.2
+  batSwingDuration: 0.2
+  swordSwingDuration: 0.016666668
+  swordDashThrustDuration: 0.12
+  spearPullbackDuration: 0.08
+  spearThrustDuration: 0.1
+  comboResetTime: 0.45
+  weaponRecoverDuration: 0.14
+  redSwingArc: 180
+  blueSwingArc: 130
+  redFirstKnockbackForce: 24
+  redSecondKnockbackForce: 30
+  blueDashSpeed: 13
+  blueDashReach: 1.9
+  spearThrustReach: 1.9
+  spearPullbackDistance: 0.35
+  yellowThrowCooldown: 2
+  yellowThrowSpeed: 12
+  yellowThrowStunDuration: 1.5
+  yellowThrowWindup: 0.22
   knockbackDuration: 0.15
+  maxHealth: 4
+  redHeartSprite: {fileID: -902086654454736923, guid: d42bbdce4f778484b824cb25d2f92606, type: 3}
+  blueHeartSprite: {fileID: 134086666222474253, guid: d42bbdce4f778484b824cb25d2f92606, type: 3}
+  yellowHeartSprite: {fileID: -9089433526600752901, guid: d42bbdce4f778484b824cb25d2f92606, type: 3}
+  heartHudSize: 38
+  heartHudSpacing: 8
+  receivedHitStop: 0.06
+  receivedHitShakeIntensity: 0.25
+  showColorWheel: 1
+  colorWheelRotateDuration: 0.18
   inputActions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
 --- !u!58 &1868206990
 CircleCollider2D:
