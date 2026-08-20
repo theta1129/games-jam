@@ -4,14 +4,16 @@ using UnityEngine;
 public static class Stop
 {
     private static bool isWaiting = false;
+    private static MonoBehaviour runner;
 
 
     public static void Pause(float duration)
     {
+        if (duration <= 0f) return;
         if (isWaiting) return;
         else isWaiting = true;
         Time.timeScale = 0.0f;
-        GameManager.instance.StartCoroutine(Wait(duration));
+        GetRunner().StartCoroutine(Wait(duration));
     }
 
 
@@ -22,4 +24,24 @@ public static class Stop
         isWaiting = false;
     }
 
+    private static MonoBehaviour GetRunner()
+    {
+        if (GameManager.instance != null)
+        {
+            return GameManager.instance;
+        }
+
+        if (runner == null)
+        {
+            GameObject runnerObject = new("Stop Runner");
+            Object.DontDestroyOnLoad(runnerObject);
+            runner = runnerObject.AddComponent<StopRunner>();
+        }
+
+        return runner;
+    }
+
+    private sealed class StopRunner : MonoBehaviour
+    {
+    }
 }

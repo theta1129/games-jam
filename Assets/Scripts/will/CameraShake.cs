@@ -29,13 +29,14 @@ public class CameraShake : MonoBehaviour
 
     public IEnumerator Shake(float duration = 0.5f, float intensity = 1f)
     {
-        Vector2 startPos = transform.position;
+        Vector3 startPos = transform.position;
         float elapsedTime = 0f;
         while (elapsedTime < duration)
         {
-            elapsedTime += Time.deltaTime;
+            elapsedTime += Time.unscaledDeltaTime;
             float strength = intensity * animationCurve.Evaluate(elapsedTime / duration);
-            transform.position = startPos + Random.insideUnitCircle * strength;
+            Vector2 offset = Random.insideUnitCircle * strength;
+            transform.position = startPos + new Vector3(offset.x, offset.y, 0f);
             yield return null;
         }
         transform.position = startPos;
