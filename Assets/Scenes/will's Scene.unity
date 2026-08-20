@@ -506,6 +506,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   size: {x: 1.25, y: 0.45}
   armReach: 0.85
+  redWeaponSprite: {fileID: 1098179606456428539, guid: fc0b7e08e0b126145b86c40d484cd8d5, type: 3}
+  blueWeaponSprite: {fileID: -5557420877203330147, guid: fc0b7e08e0b126145b86c40d484cd8d5, type: 3}
+  yellowWeaponSprite: {fileID: -7888296697152109952, guid: fc0b7e08e0b126145b86c40d484cd8d5, type: 3}
 --- !u!61 &793563545
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -664,7 +667,10 @@ MonoBehaviour:
   yellowThrowCooldown: 2
   yellowThrowSpeed: 12
   yellowThrowStunDuration: 1.5
+  yellowThrowWindup: 0.22
   knockbackDuration: 0.15
+  receivedHitStop: 0.06
+  receivedHitShakeIntensity: 0.25
   inputActions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
 --- !u!58 &834363202
 CircleCollider2D:
