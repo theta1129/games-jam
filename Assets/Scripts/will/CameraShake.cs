@@ -5,6 +5,8 @@ public class CameraShake : MonoBehaviour
 {
     public bool started = false;
     public AnimationCurve animationCurve;
+    public Vector3 CurrentOffset { get; private set; }
+
     private Coroutine shakeRoutine;
 
     private void Awake()
@@ -30,22 +32,37 @@ public class CameraShake : MonoBehaviour
     public IEnumerator Shake(float duration = 0.5f, float intensity = 1f)
     {
         Vector3 startPos = transform.position;
+        bool useAdditiveOffset = GetComponent<CombatCameraController>() != null;
         float elapsedTime = 0f;
         while (elapsedTime < duration)
         {
             elapsedTime += Time.unscaledDeltaTime;
             float strength = intensity * animationCurve.Evaluate(elapsedTime / duration);
             Vector2 offset = Random.insideUnitCircle * strength;
-            transform.position = startPos + new Vector3(offset.x, offset.y, 0f);
+            CurrentOffset = new Vector3(offset.x, offset.y, 0f);
+            if (!useAdditiveOffset)
+            {
+                transform.position = startPos + CurrentOffset;
+            }
             yield return null;
         }
-        transform.position = startPos;
+
+        if (!useAdditiveOffset)
+        {
+            transform.position = startPos;
+        }
+        CurrentOffset = Vector3.zero;
     }
 
     // Use this instead of starting Shake directly so a new impact replaces an older shake cleanly.
     public void ShakeScreen(float duration = 0.18f, float intensity = 0.25f)
     {
         if (shakeRoutine != null) StopCoroutine(shakeRoutine);
+        if (CurrentOffset != Vector3.zero && GetComponent<CombatCameraController>() == null)
+        {
+            transform.position -= CurrentOffset;
+        }
+        CurrentOffset = Vector3.zero;
         shakeRoutine = StartCoroutine(ShakeScreenRoutine(duration, intensity));
     }
 

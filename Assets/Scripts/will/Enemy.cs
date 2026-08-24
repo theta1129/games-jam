@@ -36,7 +36,9 @@ public class Enemy : MonoBehaviour
 
     public void Setup(EnemyData enemyData)
     {
-        pattern = new(enemyData.pattern);
+        pattern = enemyData != null
+            ? enemyData.GeneratePattern()
+            : new List<ColorType> { ColorType.Red, ColorType.Blue, ColorType.Yellow };
         UpdateHealth();
     }
 
@@ -52,11 +54,12 @@ public class Enemy : MonoBehaviour
         if (pattern == null || pattern.Count == 0) return false;
         if (pattern[0] == colorType)
         {
-            pattern.Remove(colorType);
+            pattern.RemoveAt(0);
             if (knockbackForce > 0f) movement.KnockBack(sourcePosition, knockbackForce);
             HitBurstVfx.Spawn(transform.position, colorType);
             HitFlash flash = GetComponent<HitFlash>() ?? gameObject.AddComponent<HitFlash>();
             flash.Flash(Color.white, 0.08f);
+            CombatCameraController.RegisterHit(transform);
             PlayHitReaction(colorType);
             UpdateHealth();
             if (pattern.Count == 0)
@@ -119,10 +122,15 @@ public class Enemy : MonoBehaviour
     {
         foreach (var h in healthPoints) Destroy(h.gameObject);
         healthPoints.Clear();
+        if (pattern == null || healthGroup == null || healthPointPrefab == null) return;
+
         foreach (var color in pattern)
         {
+            int spriteIndex = (int)color;
+            if (healthSprites == null || spriteIndex < 0 || spriteIndex >= healthSprites.Count) continue;
+
             SpriteRenderer hP = Instantiate(healthPointPrefab, healthGroup.transform);
-            hP.sprite = healthSprites[(int)color];
+            hP.sprite = healthSprites[spriteIndex];
             healthPoints.Add(hP);
         }
     }

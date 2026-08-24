@@ -12,4 +12,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f7b47c8a0d4611943ad110cccc466b9e, type: 3}
   m_Name: TestEnemy
   m_EditorClassIdentifier: 
+  generatePattern: 1
+  minGeneratedHealth: 3
+  maxGeneratedHealth: 7
+  firstColorWeights:
+    red: 1
+    blue: 1
+    yellow: 1
+  redNextColorWeights:
+    red: 0.2
+    blue: 0.55
+    yellow: 0.25
+  blueNextColorWeights:
+    red: 0.25
+    blue: 0.2
+    yellow: 0.55
+  yellowNextColorWeights:
+    red: 0.55
+    blue: 0.25
+    yellow: 0.2
   pattern: 0000000001000000010000000100000002000000
