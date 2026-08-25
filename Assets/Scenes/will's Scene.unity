@@ -506,6 +506,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   size: {x: 1.25, y: 0.45}
   armReach: 0.85
+  afterimageLifetime: 0.12
+  afterimageColor: {r: 1, g: 1, b: 1, a: 0.32}
+  trailTime: 0.2
+  trailStartWidth: 0.32
+  trailEndWidth: 0.08
   redWeaponSprite: {fileID: 1098179606456428539, guid: fc0b7e08e0b126145b86c40d484cd8d5, type: 3}
   blueWeaponSprite: {fileID: -5557420877203330147, guid: fc0b7e08e0b126145b86c40d484cd8d5, type: 3}
   yellowWeaponSprite: {fileID: -7888296697152109952, guid: fc0b7e08e0b126145b86c40d484cd8d5, type: 3}
@@ -656,21 +661,43 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e6e4fab31e28ca947885dbd2ee6cf35e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveSpeed: 5
+  moveSpeed: 7
   attackColor: 0
   attackHitBox: {fileID: 793563544}
-  attackDuration: 0.2
-  comboResetTime: 0.7
-  redWindup: 0.5
-  redFirstKnockbackForce: 8
-  redSecondKnockbackForce: 10
+  batSwingDuration: 0.2
+  swordSwingDuration: 0.016666668
+  swordDashThrustDuration: 0.16
+  spearPullbackDuration: 0.08
+  spearThrustDuration: 0.1
+  comboResetTime: 0.45
+  weaponRecoverDuration: 0.14
+  redSwingArc: 180
+  blueSwingArc: 130
+  redFirstKnockbackForce: 24
+  redSecondKnockbackForce: 30
+  redStepSpeed: 3.4
+  blueStepSpeed: 4.4
+  yellowStepSpeed: 3.8
+  attackStepDuration: 0.08
+  blueDashSpeed: 18
+  blueDashReach: 2.35
+  spearThrustReach: 1.9
+  spearPullbackDistance: 0.35
   yellowThrowCooldown: 2
   yellowThrowSpeed: 12
   yellowThrowStunDuration: 1.5
   yellowThrowWindup: 0.22
   knockbackDuration: 0.15
+  maxHealth: 4
+  redHeartSprite: {fileID: -902086654454736923, guid: d42bbdce4f778484b824cb25d2f92606, type: 3}
+  blueHeartSprite: {fileID: 134086666222474253, guid: d42bbdce4f778484b824cb25d2f92606, type: 3}
+  yellowHeartSprite: {fileID: -9089433526600752901, guid: d42bbdce4f778484b824cb25d2f92606, type: 3}
+  heartHudSize: 38
+  heartHudSpacing: 8
   receivedHitStop: 0.06
   receivedHitShakeIntensity: 0.25
+  showColorWheel: 1
+  colorWheelRotateDuration: 0.18
   inputActions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
 --- !u!58 &834363202
 CircleCollider2D:
@@ -731,7 +758,7 @@ Rigidbody2D:
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
-  m_Interpolate: 0
+  m_Interpolate: 1
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 4

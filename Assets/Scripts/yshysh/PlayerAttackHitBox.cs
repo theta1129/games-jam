@@ -9,13 +9,15 @@ public class PlayerAttackHitBox : MonoBehaviour
     private static Sprite fallbackHitboxSprite;
 
     [SerializeField] private Vector2 size = new(1.25f, 0.45f);
+    [SerializeField] private float hitboxLengthMultiplier = 1.25f;
+    [SerializeField] private float hitboxThicknessMultiplier = 1.45f;
     [SerializeField] private float armReach = 0.85f;
     [SerializeField] private float afterimageLifetime = 0.12f;
     [SerializeField] private Color afterimageColor = new(1f, 1f, 1f, 0.32f);
     [Header("Attack trail")]
-    [SerializeField] private float trailTime = 0.12f;
-    [SerializeField] private float trailStartWidth = 0.18f;
-    [SerializeField] private float trailEndWidth = 0.02f;
+    [SerializeField] private float trailTime = 0.2f;
+    [SerializeField] private float trailStartWidth = 0.32f;
+    [SerializeField] private float trailEndWidth = 0.08f;
     [Header("Weapon sprites (vertical artwork)")]
     [SerializeField] private Sprite redWeaponSprite;
     [SerializeField] private Sprite blueWeaponSprite;
@@ -38,6 +40,7 @@ public class PlayerAttackHitBox : MonoBehaviour
     private Coroutine recoveryRoutine;
 
     public bool IsSwinging => swingRoutine != null;
+    public bool IsBusy => swingRoutine != null || throwRoutine != null || recoveryRoutine != null;
     public Sprite WeaponSprite => activeWeaponSprite;
     private bool HasWeaponSprite => activeWeaponSprite != null;
 
@@ -228,7 +231,7 @@ public class PlayerAttackHitBox : MonoBehaviour
     {
         hitCollider ??= GetComponent<BoxCollider2D>();
         hitCollider.isTrigger = true;
-        hitCollider.size = HasWeaponSprite ? new Vector2(size.y, size.x) : size;
+        hitCollider.size = GetHitColliderSize();
         hitCollider.offset = Vector2.zero;
         spriteRenderer ??= GetComponent<SpriteRenderer>();
 
@@ -252,7 +255,7 @@ public class PlayerAttackHitBox : MonoBehaviour
         {
             EnsureSprite();
             spriteRenderer.drawMode = SpriteDrawMode.Sliced;
-            spriteRenderer.size = size;
+            spriteRenderer.size = GetHitColliderSize();
             spriteRenderer.color = GetDisplayColor(activeColor);
             spriteRenderer.sortingOrder = 10;
             spriteRenderer.enabled = true;
@@ -352,16 +355,16 @@ public class PlayerAttackHitBox : MonoBehaviour
         trail.layer = gameObject.layer;
         weaponTrail = trail.AddComponent<TrailRenderer>();
         weaponTrail.time = trailTime;
-        weaponTrail.minVertexDistance = 0.015f;
+        weaponTrail.minVertexDistance = 0.01f;
         weaponTrail.startWidth = trailStartWidth;
         weaponTrail.endWidth = trailEndWidth;
-        weaponTrail.numCapVertices = 2;
-        weaponTrail.numCornerVertices = 2;
+        weaponTrail.numCapVertices = 4;
+        weaponTrail.numCornerVertices = 4;
         weaponTrail.autodestruct = false;
         weaponTrail.emitting = false;
         weaponTrail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         weaponTrail.receiveShadows = false;
-        weaponTrail.sortingOrder = 8;
+        weaponTrail.sortingOrder = 12;
 
         Shader shader = Shader.Find("Sprites/Default") ?? Shader.Find("Default");
         if (shader != null)
@@ -402,9 +405,9 @@ public class PlayerAttackHitBox : MonoBehaviour
         if (weaponTrail == null) return;
 
         Color color = GetDisplayColor(activeColor);
-        color.a = 0.72f;
+        color.a = 0.88f;
         Color softColor = Color.Lerp(color, Color.white, 0.35f);
-        softColor.a = 0.15f;
+        softColor.a = 0.26f;
 
         Gradient gradient = new();
         gradient.SetKeys(
@@ -416,15 +419,23 @@ public class PlayerAttackHitBox : MonoBehaviour
             },
             new[]
             {
-                new GradientAlphaKey(0.95f, 0f),
-                new GradientAlphaKey(0.48f, 0.55f),
-                new GradientAlphaKey(0f, 1f),
+                new GradientAlphaKey(1f, 0f),
+                new GradientAlphaKey(0.68f, 0.55f),
+                new GradientAlphaKey(0.03f, 1f),
             });
 
         weaponTrail.time = trailTime;
         weaponTrail.startWidth = trailStartWidth;
         weaponTrail.endWidth = trailEndWidth;
         weaponTrail.colorGradient = gradient;
+    }
+
+    private Vector2 GetHitColliderSize()
+    {
+        Vector2 baseSize = HasWeaponSprite ? new Vector2(size.y, size.x) : size;
+        return HasWeaponSprite
+            ? new Vector2(baseSize.x * hitboxThicknessMultiplier, baseSize.y * hitboxLengthMultiplier)
+            : new Vector2(baseSize.x * hitboxLengthMultiplier, baseSize.y * hitboxThicknessMultiplier);
     }
 
     private void FitWeaponVisual()

@@ -9,6 +9,7 @@ public class Player : MonoBehaviour
     public static Player Instance { get; private set; }
 
     [SerializeField] private float moveSpeed = 7f;
+    [SerializeField] private float moveDeadZone = 0.12f;
     [SerializeField] private ColorType attackColor = ColorType.Red;
     [SerializeField] private PlayerAttackHitBox attackHitBox;
     [SerializeField] private float batSwingDuration = 0.2f;
@@ -76,6 +77,7 @@ public class Player : MonoBehaviour
     private int colorWheelAnimationDirection;
     private int currentHealth;
     private int comboStep;
+    private int queuedColorSwitchSteps;
     private bool isIgnoringDashEnemyCollision;
     private bool isThrowingYellowArm;
 
@@ -102,6 +104,7 @@ public class Player : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         rb.gravityScale = 0f;
         rb.freezeRotation = true;
+        rb.interpolation = RigidbodyInterpolation2D.Interpolate;
         maxHealth = Mathf.Max(1, maxHealth);
         currentHealth = maxHealth;
 
@@ -115,6 +118,11 @@ public class Player : MonoBehaviour
         CreateStates();
         ChangeState(PlayerStates.Idle);
         ResolveInputActions();
+    }
+
+    private void Start()
+    {
+        CombatCameraController.Ensure(Camera.main, transform);
     }
 
     private void OnEnable()
@@ -145,6 +153,7 @@ public class Player : MonoBehaviour
     private void Update()
     {
         HandleColorSelection();
+        TryApplyQueuedColorSwitch();
 
         Vector2 mouseDirection = GetMouseAttackDirection();
         if (mouseDirection.sqrMagnitude > InputThreshold)
@@ -164,11 +173,13 @@ public class Player : MonoBehaviour
             comboStep = 0;
             attackHitBox?.RecoverToRestPose(facingDirection, weaponRecoverDuration);
         }
+
+        TryApplyQueuedColorSwitch();
     }
 
     private void FixedUpdate()
     {
-        moveInput = moveAction != null ? moveAction.ReadValue<Vector2>() : Vector2.zero;
+        moveInput = ReadMoveInput();
 
         if (Time.time < knockbackEndTime)
         {
@@ -228,7 +239,7 @@ public class Player : MonoBehaviour
 
     internal void Move()
     {
-        rb.linearVelocity = moveInput.normalized * moveSpeed;
+        rb.linearVelocity = Vector2.ClampMagnitude(moveInput, 1f) * moveSpeed;
     }
 
     internal void StopMovement()
@@ -369,6 +380,19 @@ public class Player : MonoBehaviour
         return (Vector2)(mouseWorldPosition - transform.position);
     }
 
+    private Vector2 ReadMoveInput()
+    {
+        if (moveAction == null)
+        {
+            return Vector2.zero;
+        }
+
+        Vector2 input = moveAction.ReadValue<Vector2>();
+        return input.sqrMagnitude < moveDeadZone * moveDeadZone
+            ? Vector2.zero
+            : Vector2.ClampMagnitude(input, 1f);
+    }
+
     private void HandleColorSelection()
     {
         if (Keyboard.current == null)
@@ -378,13 +402,49 @@ public class Player : MonoBehaviour
 
         if (Keyboard.current.eKey.wasPressedThisFrame)
         {
-            CycleAttackColor(1);
+            RequestColorSwitch(1);
         }
 
         if (Keyboard.current.qKey.wasPressedThisFrame)
         {
-            CycleAttackColor(-1);
+            RequestColorSwitch(-1);
         }
+    }
+
+    private void RequestColorSwitch(int direction)
+    {
+        int normalizedDirection = NormalizeColorSwitchSteps(direction);
+        if (normalizedDirection == 0)
+        {
+            return;
+        }
+
+        if (IsColorSwitchLocked())
+        {
+            queuedColorSwitchSteps = NormalizeColorSwitchSteps(queuedColorSwitchSteps + normalizedDirection);
+            return;
+        }
+
+        CycleAttackColor(normalizedDirection);
+    }
+
+    private void TryApplyQueuedColorSwitch()
+    {
+        if (queuedColorSwitchSteps == 0 || IsColorSwitchLocked())
+        {
+            return;
+        }
+
+        int direction = queuedColorSwitchSteps;
+        queuedColorSwitchSteps = 0;
+        CycleAttackColor(direction);
+    }
+
+    private bool IsColorSwitchLocked()
+    {
+        return CurrentState == PlayerStates.Attack
+            || isThrowingYellowArm
+            || (attackHitBox != null && attackHitBox.IsBusy);
     }
 
     private void Damage(int amount)
@@ -399,14 +459,26 @@ public class Player : MonoBehaviour
 
     private void CycleAttackColor(int direction)
     {
+        direction = NormalizeColorSwitchSteps(direction);
+        if (direction == 0) return;
+
         int currentIndex = Array.IndexOf(AttackColorCycle, attackColor);
         if (currentIndex < 0) currentIndex = 0;
         attackColor = AttackColorCycle[(currentIndex + direction + AttackColorCycle.Length) % AttackColorCycle.Length];
-        colorWheelAnimationDirection = direction;
+        colorWheelAnimationDirection = Math.Sign(direction);
         colorWheelAnimationStartTime = Time.unscaledTime;
         comboStep = 0;
         attackHitBox?.SetColor(attackColor);
         attackHitBox?.RecoverToRestPose(facingDirection, weaponRecoverDuration * 0.5f);
+    }
+
+    private static int NormalizeColorSwitchSteps(int steps)
+    {
+        int colorCount = AttackColorCycle.Length;
+        steps %= colorCount;
+        if (steps > colorCount / 2) steps -= colorCount;
+        if (steps < -colorCount / 2) steps += colorCount;
+        return steps;
     }
 
     private static void ShakeCamera(float duration, float intensity)
