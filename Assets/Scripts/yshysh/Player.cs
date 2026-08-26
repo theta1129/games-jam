@@ -52,11 +52,17 @@ public class Player : MonoBehaviour
     [SerializeField] private float colorWheelRotateDuration = 0.18f;
     [SerializeField] private InputActionAsset inputActions;
 
+    [Header("Animation")]
+    [SerializeField] private Animator animator;
+
     private const string MoveActionName = "Player/Move";
     private const string AttackActionName = "Player/Attack";
     private const float InputThreshold = 0.001f;
     private static readonly ColorType[] AttackColorCycle = { ColorType.Yellow, ColorType.Blue, ColorType.Red };
     private static readonly Dictionary<ColorType, Texture2D> colorWheelTextures = new();
+    private static readonly int IsIdleAnimatorHash = Animator.StringToHash("isIdle");
+    private static readonly int IsAttackingAnimatorHash = Animator.StringToHash("isAttacking");
+    private static readonly int IsMovingAnimatorHash = Animator.StringToHash("isMoving");
     private static Texture2D colorWheelOutlineTexture;
 
     private readonly Dictionary<PlayerStates, State> states = new();
@@ -77,7 +83,8 @@ public class Player : MonoBehaviour
     private int colorWheelAnimationDirection;
     private int currentHealth;
     private int comboStep;
-    private int queuedColorSwitchSteps;
+    private bool pendingAttackHitBoxColorSync;
+    private float invulnerableUntilRealtime = -1f;
     private bool isIgnoringDashEnemyCollision;
     private bool isThrowingYellowArm;
 
@@ -85,6 +92,15 @@ public class Player : MonoBehaviour
     public ColorType CurrentAttackColor => attackColor;
     public int CurrentHealth => currentHealth;
     public int MaxHealth => maxHealth;
+    public bool IsInvulnerable => Time.unscaledTime < invulnerableUntilRealtime;
+
+    // Color selection itself may change immediately, but color-triggered actions
+    // such as the Blue switch dash should wait until the current attack/weapon
+    // motion has completely finished.
+    public bool IsBusyForColorTriggeredAction =>
+        CurrentState == PlayerStates.Attack
+        || isThrowingYellowArm
+        || (attackHitBox != null && attackHitBox.IsBusy);
 
     internal Vector2 MoveInput => moveInput;
     internal bool HasMoveInput => moveInput.sqrMagnitude > InputThreshold;
@@ -102,6 +118,7 @@ public class Player : MonoBehaviour
 
         Instance = this;
         rb = GetComponent<Rigidbody2D>();
+        animator ??= GetComponentInChildren<Animator>(true);
         rb.gravityScale = 0f;
         rb.freezeRotation = true;
         rb.interpolation = RigidbodyInterpolation2D.Interpolate;
@@ -152,8 +169,9 @@ public class Player : MonoBehaviour
 
     private void Update()
     {
+        // Color input is never queued. The selected color/UI changes immediately.
         HandleColorSelection();
-        TryApplyQueuedColorSwitch();
+        TrySyncAttackHitBoxColor();
 
         Vector2 mouseDirection = GetMouseAttackDirection();
         if (mouseDirection.sqrMagnitude > InputThreshold)
@@ -174,7 +192,8 @@ public class Player : MonoBehaviour
             attackHitBox?.RecoverToRestPose(facingDirection, weaponRecoverDuration);
         }
 
-        TryApplyQueuedColorSwitch();
+        TrySyncAttackHitBoxColor();
+        UpdateAnimatorParameters();
     }
 
     private void FixedUpdate()
@@ -199,6 +218,13 @@ public class Player : MonoBehaviour
 
     private void OnAttackPerformed(InputAction.CallbackContext context)
     {
+        // Space is reserved for switching the attack color to the right.
+        // Ignore a Space binding here so one key press cannot switch color and attack at the same time.
+        if (Keyboard.current != null && context.control == Keyboard.current.spaceKey)
+        {
+            return;
+        }
+
         TryStartAttack(false);
     }
 
@@ -235,6 +261,7 @@ public class Player : MonoBehaviour
         activeState = next;
         CurrentState = nextState;
         activeState.EnterState();
+        UpdateAnimatorParameters();
     }
 
     internal void Move()
@@ -261,6 +288,11 @@ public class Player : MonoBehaviour
 
     public void ReceiveHit(Vector2 sourcePosition, float force)
     {
+        if (IsInvulnerable)
+        {
+            return;
+        }
+
         Damage(1);
         KnockBack(sourcePosition, force);
         Stop.Pause(receivedHitStop);
@@ -274,6 +306,18 @@ public class Player : MonoBehaviour
             CameraShake shake = gameCamera.GetComponent<CameraShake>() ?? gameCamera.gameObject.AddComponent<CameraShake>();
             shake.ShakeScreen(0.14f, receivedHitShakeIntensity);
         }
+    }
+
+    public void GrantInvulnerability(float duration)
+    {
+        if (duration <= 0f)
+        {
+            return;
+        }
+
+        invulnerableUntilRealtime = Mathf.Max(
+            invulnerableUntilRealtime,
+            Time.unscaledTime + duration);
     }
 
     internal void PerformAttack()
@@ -400,14 +444,19 @@ public class Player : MonoBehaviour
             return;
         }
 
-        if (Keyboard.current.eKey.wasPressedThisFrame)
-        {
-            RequestColorSwitch(1);
-        }
+        // Left color switch: either Shift key.
+        bool shiftPressed = Keyboard.current.leftShiftKey.wasPressedThisFrame
+            || Keyboard.current.rightShiftKey.wasPressedThisFrame;
 
-        if (Keyboard.current.qKey.wasPressedThisFrame)
+        if (shiftPressed)
         {
             RequestColorSwitch(-1);
+        }
+
+        // Right color switch: Space.
+        if (Keyboard.current.spaceKey.wasPressedThisFrame)
+        {
+            RequestColorSwitch(1);
         }
     }
 
@@ -419,32 +468,49 @@ public class Player : MonoBehaviour
             return;
         }
 
-        if (IsColorSwitchLocked())
-        {
-            queuedColorSwitchSteps = NormalizeColorSwitchSteps(queuedColorSwitchSteps + normalizedDirection);
-            return;
-        }
-
+        // Do not buffer color input. Selection changes immediately even during an attack.
         CycleAttackColor(normalizedDirection);
     }
 
-    private void TryApplyQueuedColorSwitch()
+    private void TrySyncAttackHitBoxColor()
     {
-        if (queuedColorSwitchSteps == 0 || IsColorSwitchLocked())
+        if (!pendingAttackHitBoxColorSync || IsBusyForColorTriggeredAction)
         {
             return;
         }
 
-        int direction = queuedColorSwitchSteps;
-        queuedColorSwitchSteps = 0;
-        CycleAttackColor(direction);
+        pendingAttackHitBoxColorSync = false;
+        SyncAttackHitBoxColor();
     }
 
-    private bool IsColorSwitchLocked()
+    private void SyncAttackHitBoxColor()
     {
-        return CurrentState == PlayerStates.Attack
-            || isThrowingYellowArm
-            || (attackHitBox != null && attackHitBox.IsBusy);
+        if (attackHitBox == null)
+        {
+            return;
+        }
+
+        attackHitBox.SetColor(attackColor);
+        attackHitBox.RecoverToRestPose(
+            facingDirection,
+            weaponRecoverDuration * 0.5f);
+    }
+
+    private void UpdateAnimatorParameters()
+    {
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>(true);
+            if (animator == null) return;
+        }
+
+        bool isAttacking = CurrentState == PlayerStates.Attack || isThrowingYellowArm;
+        bool isMoving = !isAttacking && CurrentState == PlayerStates.Move;
+        bool isIdle = !isAttacking && !isMoving;
+
+        animator.SetBool(IsIdleAnimatorHash, isIdle);
+        animator.SetBool(IsAttackingAnimatorHash, isAttacking);
+        animator.SetBool(IsMovingAnimatorHash, isMoving);
     }
 
     private void Damage(int amount)
@@ -460,16 +526,42 @@ public class Player : MonoBehaviour
     private void CycleAttackColor(int direction)
     {
         direction = NormalizeColorSwitchSteps(direction);
-        if (direction == 0) return;
+        if (direction == 0)
+        {
+            return;
+        }
 
         int currentIndex = Array.IndexOf(AttackColorCycle, attackColor);
-        if (currentIndex < 0) currentIndex = 0;
-        attackColor = AttackColorCycle[(currentIndex + direction + AttackColorCycle.Length) % AttackColorCycle.Length];
+        if (currentIndex < 0)
+        {
+            currentIndex = 0;
+        }
+
+        ColorType nextColor = AttackColorCycle[
+            (currentIndex + direction + AttackColorCycle.Length)
+            % AttackColorCycle.Length];
+
+        if (nextColor == attackColor)
+        {
+            return;
+        }
+
+        // Selected color/UI changes immediately.
+        attackColor = nextColor;
         colorWheelAnimationDirection = Math.Sign(direction);
         colorWheelAnimationStartTime = Time.unscaledTime;
         comboStep = 0;
-        attackHitBox?.SetColor(attackColor);
-        attackHitBox?.RecoverToRestPose(facingDirection, weaponRecoverDuration * 0.5f);
+
+        // Never overwrite PlayerAttackHitBox.activeColor during a running attack.
+        // That lets the current attack finish with the color it started with.
+        if (IsBusyForColorTriggeredAction)
+        {
+            pendingAttackHitBoxColorSync = true;
+            return;
+        }
+
+        pendingAttackHitBoxColorSync = false;
+        SyncAttackHitBoxColor();
     }
 
     private static int NormalizeColorSwitchSteps(int steps)
@@ -525,8 +617,9 @@ public class Player : MonoBehaviour
             fontStyle = FontStyle.Bold,
         };
         keyStyle.normal.textColor = Color.white;
-        GUI.Label(new Rect(wheelCenter.x - 38f * scale, wheelCenter.y + 58f * scale, 34f * scale, 30f * scale), "Q", keyStyle);
-        GUI.Label(new Rect(wheelCenter.x + 4f * scale, wheelCenter.y + 58f * scale, 34f * scale, 30f * scale), "E", keyStyle);
+        keyStyle.fontSize = Mathf.RoundToInt(16f * scale);
+        GUI.Label(new Rect(wheelCenter.x - 82f * scale, wheelCenter.y + 58f * scale, 70f * scale, 30f * scale), "SHIFT", keyStyle);
+        GUI.Label(new Rect(wheelCenter.x + 12f * scale, wheelCenter.y + 58f * scale, 70f * scale, 30f * scale), "SPACE", keyStyle);
     }
 
     private void DrawHealthHud(float scale)

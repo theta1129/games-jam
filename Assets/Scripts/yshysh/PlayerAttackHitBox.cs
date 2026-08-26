@@ -11,6 +11,11 @@ public class PlayerAttackHitBox : MonoBehaviour
     [SerializeField] private Vector2 size = new(1.25f, 0.45f);
     [SerializeField] private float hitboxLengthMultiplier = 1.25f;
     [SerializeField] private float hitboxThicknessMultiplier = 1.45f;
+    [Header("Hitbox size boost")]
+    [SerializeField, Min(1f)] private float overallAttackHitboxScale = 1.30f;
+    [SerializeField, Min(1f)] private float blueAttackHitboxScale = 1.25f;
+    [Header("Reliable area hit detection")]
+    [SerializeField] private bool useDirectOverlapChecks = true;
     [SerializeField] private float armReach = 0.85f;
     [SerializeField] private float afterimageLifetime = 0.12f;
     [SerializeField] private Color afterimageColor = new(1f, 1f, 1f, 0.32f);
@@ -198,12 +203,14 @@ public class PlayerAttackHitBox : MonoBehaviour
         SpawnSwingAfterimages(startAngle, centerAngle, endAngle, duration);
         SetTrailActive(true);
         hitCollider.enabled = true;
+        CheckHitsInCurrentArea();
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
             float progress = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
             float angle = Mathf.Lerp(startAngle, endAngle, progress);
             SetArmPose(AngleToDirection(angle));
+            CheckHitsInCurrentArea();
             yield return null;
         }
 
@@ -284,11 +291,13 @@ public class PlayerAttackHitBox : MonoBehaviour
         SpawnThrustAfterimage(direction, thrustReach, duration);
         SetTrailActive(true);
         hitCollider.enabled = true;
+        CheckHitsInCurrentArea();
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
             float progress = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
             SetArmPose(direction, Mathf.Lerp(pulledReach, thrustReach, progress));
+            CheckHitsInCurrentArea();
             yield return null;
         }
 
@@ -433,9 +442,18 @@ public class PlayerAttackHitBox : MonoBehaviour
     private Vector2 GetHitColliderSize()
     {
         Vector2 baseSize = HasWeaponSprite ? new Vector2(size.y, size.x) : size;
-        return HasWeaponSprite
+        Vector2 calculatedSize = HasWeaponSprite
             ? new Vector2(baseSize.x * hitboxThicknessMultiplier, baseSize.y * hitboxLengthMultiplier)
             : new Vector2(baseSize.x * hitboxLengthMultiplier, baseSize.y * hitboxThicknessMultiplier);
+
+        // Make every melee attack larger, then give Blue an additional boost.
+        // Mathf.Max keeps the requested minimum boost even on already-existing prefabs/scenes.
+        float overallScale = Mathf.Max(1.30f, overallAttackHitboxScale);
+        float colorScale = activeColor == ColorType.Blue
+            ? Mathf.Max(1.25f, blueAttackHitboxScale)
+            : 1f;
+
+        return calculatedSize * overallScale * colorScale;
     }
 
     private void FitWeaponVisual()
@@ -536,18 +554,42 @@ public class PlayerAttackHitBox : MonoBehaviour
     private void OnTriggerEnter2D(Collider2D other) => TryHit(other);
     private void OnTriggerStay2D(Collider2D other) => TryHit(other);
 
+    // Directly checks every collider inside the current weapon box.
+    // This is intentionally kept in addition to Trigger callbacks so very short/fast
+    // attacks can still hit every enemy in the area.
+    private void CheckHitsInCurrentArea()
+    {
+        if (!useDirectOverlapChecks || !IsSwinging || hitCollider == null || !hitCollider.enabled) return;
+
+        Vector2 center = transform.TransformPoint(hitCollider.offset);
+        Vector3 lossyScale = transform.lossyScale;
+        Vector2 worldSize = new(
+            hitCollider.size.x * Mathf.Abs(lossyScale.x),
+            hitCollider.size.y * Mathf.Abs(lossyScale.y));
+        float angle = transform.eulerAngles.z;
+
+        Collider2D[] overlaps = Physics2D.OverlapBoxAll(center, worldSize, angle);
+        for (int i = 0; i < overlaps.Length; i++)
+        {
+            TryHit(overlaps[i]);
+        }
+    }
+
     private void TryHit(Collider2D other)
     {
-        if (!IsSwinging) return;
+        if (!IsSwinging || other == null) return;
+
         Enemy enemy = other.GetComponentInParent<Enemy>();
         if (enemy == null || enemy.pattern == null || enemy.pattern.Count == 0 || hitEnemies.Contains(enemy)) return;
+
+        // Enemy.OnHit returns true for any real contact, even when the color is wrong.
+        // Therefore wrong-color hits still consume this enemy once for this attack,
+        // while health reduction is handled separately inside Enemy.
         if (!enemy.OnHit(activeColor, transform.position, activeKnockbackForce)) return;
 
+        // Area attack rule: each enemy can be hit once per attack, but hitting one
+        // enemy NEVER turns the hitbox off. Every other enemy in the area is processed.
         hitEnemies.Add(enemy);
-        if (!activePierce)
-        {
-            hitCollider.enabled = false;
-        }
     }
 
     private void EnsureSprite()

@@ -14,6 +14,11 @@ public sealed class IdleState : State
         if (player.HasMoveInput)
         {
             player.ChangeState(PlayerStates.Move);
+            return;
         }
+
+        // 넉백이 끝난 뒤 Idle 상태로 돌아왔을 때
+        // 남아 있는 Rigidbody 속도를 계속 제거한다.
+        player.StopMovement();
     }
 }
