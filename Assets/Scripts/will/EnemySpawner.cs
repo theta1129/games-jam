@@ -132,14 +132,87 @@ public class EnemySpawner : MonoBehaviour
 
 
     // =========================
-    // 게임오버 연출
+    // 게임오버
     // =========================
 
     private IEnumerator GameOver()
     {
-        // 적 소환 중지
+        // 적 소환 중단
         summon = false;
 
+
+        // =========================
+        // 플레이어 죽음 애니메이션
+        // =========================
+
+        Animator playerAnimator =
+            Player.Instance.GetComponentInChildren<Animator>(true);
+
+
+        if (playerAnimator != null)
+        {
+            // 게임이 멈춰도 Animator는 계속 움직이게 함
+            playerAnimator.updateMode =
+                AnimatorUpdateMode.UnscaledTime;
+
+
+            // 현재 플레이어 색
+            ColorType currentColor =
+                Player.Instance.CurrentAttackColor;
+
+
+            // =====================
+            // RED
+            // =====================
+
+            if (currentColor == ColorType.Red)
+            {
+                playerAnimator.Play(
+                    "Base Layer.deathRed",
+                    0,
+                    0f
+                );
+            }
+
+
+            // =====================
+            // YELLOW
+            // deathyellow 정확한 이름
+            // =====================
+
+            else if (currentColor == ColorType.Yellow)
+            {
+                playerAnimator.Play(
+                    "Base Layer.deathyellow",
+                    0,
+                    0f
+                );
+            }
+
+
+            // =====================
+            // BLUE
+            // deathblue 정확한 이름
+            // =====================
+
+            else if (currentColor == ColorType.Blue)
+            {
+                playerAnimator.Play(
+                    "Base Layer.deathblue",
+                    0,
+                    0f
+                );
+            }
+
+
+            // 바로 첫 프레임 적용
+            playerAnimator.Update(0f);
+        }
+
+
+        // =========================
+        // 카메라
+        // =========================
 
         Camera cam =
             Camera.main;
@@ -157,7 +230,10 @@ public class EnemySpawner : MonoBehaviour
             black.color.a;
 
 
+        // =========================
         // 게임 정지
+        // =========================
+
         Time.timeScale = 0f;
 
 
@@ -166,8 +242,7 @@ public class EnemySpawner : MonoBehaviour
 
         while (timer < gameOverDuration)
         {
-            // timeScale이 0이므로
-            // unscaledDeltaTime 사용
+            // TimeScale = 0이어도 진행
             timer += Time.unscaledDeltaTime;
 
 
@@ -185,7 +260,7 @@ public class EnemySpawner : MonoBehaviour
                 Player.Instance.transform.position;
 
 
-            // 카메라 Z값 유지
+            // 기존 카메라 Z 유지
             targetPosition.z =
                 cameraStartPosition.z;
 
@@ -211,7 +286,7 @@ public class EnemySpawner : MonoBehaviour
 
 
             // =========================
-            // 검은 화면
+            // Black Fade In
             // =========================
 
             Color color =
@@ -234,21 +309,34 @@ public class EnemySpawner : MonoBehaviour
         }
 
 
-        // 확실하게 알파 1
+        // =========================
+        // 완전히 검게
+        // =========================
+
         Color finalColor =
             black.color;
 
-        finalColor.a = 1f;
+
+        finalColor.a =
+            1f;
+
 
         black.color =
             finalColor;
 
 
-        // 다음 씬에서 게임이 멈춘 상태로 시작하지 않게 복구
-        Time.timeScale = 1f;
+        // =========================
+        // TimeScale 복구
+        // =========================
+
+        Time.timeScale =
+            1f;
 
 
-        // 메인 씬
+        // =========================
+        // Lobby 이동
+        // =========================
+
         SceneManager.LoadScene(
             "LobbyScene"
         );
