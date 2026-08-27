@@ -2,17 +2,41 @@ using UnityEngine;
 
 public sealed class EnemyMovement : MonoBehaviour
 {
-    [SerializeField] private float moveSpeed = 2.5f;
+    [SerializeField]
+    private float moveSpeed = 2.5f;
+
 
     [Header("Visual / Flip")]
+
     [Tooltip("오른쪽을 보고 있는 스프라이트가 기본입니다.")]
-    [SerializeField] private SpriteRenderer visualRenderer;
+    [SerializeField]
+    private SpriteRenderer visualRenderer;
+
 
     private Vector2 knockbackVelocity;
 
     private float knockbackEndTime;
     private float stunEndTime;
 
+    private bool isMoving;
+
+
+    // =========================================================
+    // Properties
+    // =========================================================
+
+    public bool IsMoving =>
+        isMoving;
+
+
+    public bool IsStunned =>
+        Time.time <
+        stunEndTime;
+
+
+    // =========================================================
+    // Awake
+    // =========================================================
 
     private void Awake()
     {
@@ -20,56 +44,73 @@ public sealed class EnemyMovement : MonoBehaviour
     }
 
 
-    public void Tick(Player player)
+    // =========================================================
+    // Tick
+    // =========================================================
+
+    public void Tick(
+        Player player
+    )
     {
+        // 매 프레임 기본은 이동하지 않는 상태
+        isMoving = false;
+
+
         if (player == null)
         {
             return;
         }
 
 
-        // =========================================
-        // 넉백을 스턴보다 먼저 처리
-        //
-        // 맞아서 스턴 상태가 되어도
-        // 날아가는 효과는 정상적으로 보여야 함
-        // =========================================
+        // =====================================================
+        // Knockback
+        // =====================================================
 
-        if (Time.time < knockbackEndTime)
+        if (
+            Time.time <
+            knockbackEndTime
+        )
         {
             transform.position +=
                 (Vector3)(
-                    knockbackVelocity *
+                    knockbackVelocity
+                    *
                     Time.deltaTime
                 );
+
 
             return;
         }
 
 
-        // 넉백은 끝남
-        knockbackVelocity = Vector2.zero;
+        knockbackVelocity =
+            Vector2.zero;
 
 
-        // =========================================
-        // 스턴
-        // =========================================
+        // =====================================================
+        // Stun
+        // =====================================================
 
-        if (Time.time < stunEndTime)
+        if (
+            Time.time <
+            stunEndTime
+        )
         {
             return;
         }
 
 
-        // =========================================
-        // 플레이어 추적
-        // =========================================
+        // =====================================================
+        // Player 방향
+        // =====================================================
 
         Vector2 toPlayer =
-            (Vector2)player.transform.position -
+            (Vector2)player.transform.position
+            -
             (Vector2)transform.position;
 
 
+        // 플레이어와 충분히 멀 때만 추적
         if (
             toPlayer.sqrMagnitude >
             1.2f * 1.2f
@@ -86,21 +127,64 @@ public sealed class EnemyMovement : MonoBehaviour
 
             transform.position +=
                 (Vector3)(
-                    direction *
-                    moveSpeed *
+                    direction
+                    *
+                    moveSpeed
+                    *
                     Time.deltaTime
                 );
+
+
+            // ★ 실제로 움직임
+            isMoving = true;
         }
     }
 
+
+    // =========================================================
+    // Face Player
+    // =========================================================
+
+    public void FacePlayer(
+        Player player
+    )
+    {
+        isMoving = false;
+
+
+        if (player == null)
+        {
+            return;
+        }
+
+
+        float horizontalDirection =
+            player.transform.position.x
+            -
+            transform.position.x;
+
+
+        UpdateSpriteFlip(
+            horizontalDirection
+        );
+    }
+
+
+    // =========================================================
+    // Knockback
+    // =========================================================
 
     public void KnockBack(
         Vector2 sourcePosition,
         float force
     )
     {
+        isMoving = false;
+
+
         Vector2 direction =
-            (Vector2)transform.position -
+            (Vector2)transform.position
+            -
             sourcePosition;
 
 
@@ -128,20 +212,54 @@ public sealed class EnemyMovement : MonoBehaviour
     }
 
 
-    public void Stun(float duration)
+    // =========================================================
+    // Stun
+    // =========================================================
+
+    public void Stun(
+        float duration
+    )
     {
+        isMoving = false;
+
+
         stunEndTime =
             Mathf.Max(
                 stunEndTime,
-                Time.time +
-                Mathf.Max(0f, duration)
+                Time.time
+                +
+                Mathf.Max(
+                    0f,
+                    duration
+                )
             );
     }
 
 
-    public bool IsStunned =>
-        Time.time < stunEndTime;
+    // =========================================================
+    // Stop
+    // =========================================================
 
+    public void StopImmediately()
+    {
+        isMoving = false;
+
+        knockbackVelocity =
+            Vector2.zero;
+
+
+        knockbackEndTime =
+            -1f;
+
+
+        stunEndTime =
+            -1f;
+    }
+
+
+    // =========================================================
+    // Sprite Renderer
+    // =========================================================
 
     private void ResolveVisualRenderer()
     {
@@ -165,12 +283,19 @@ public sealed class EnemyMovement : MonoBehaviour
     }
 
 
+    // =========================================================
+    // Flip
+    // =========================================================
+
     private void UpdateSpriteFlip(
         float horizontalDirection
     )
     {
         if (
-            Mathf.Abs(horizontalDirection) <=
+            Mathf.Abs(
+                horizontalDirection
+            )
+            <=
             0.001f
         )
         {
@@ -187,7 +312,7 @@ public sealed class EnemyMovement : MonoBehaviour
         }
 
 
-        // 원본 Sprite = 오른쪽
+        // 원본 스프라이트가 오른쪽을 바라보는 기준
         visualRenderer.flipX =
             horizontalDirection < 0f;
     }

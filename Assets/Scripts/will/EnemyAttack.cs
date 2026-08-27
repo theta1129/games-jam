@@ -13,21 +13,26 @@ public sealed class EnemyAttack : MonoBehaviour
     [SerializeField]
     private float detectionRange = 1.8f;
 
+
     [Tooltip("붉은 원의 크기 = 실제 공격 범위입니다.")]
     [SerializeField]
     private float attackRadius = 1.45f;
+
 
     [Tooltip("붉은 범위가 나타난 뒤 실제 공격까지 걸리는 시간")]
     [SerializeField]
     private float attackWindup = 0.42f;
 
+
     [Tooltip("공격 후 다음 공격까지 대기 시간")]
     [SerializeField]
     private float attackCooldown = 1.15f;
 
-    [Tooltip("공격 준비 중 스턴을 당해 취소되었을 때 재공격까지 짧은 대기시간")]
+
+    [Tooltip("공격 준비 중 스턴으로 취소됐을 때 재공격 대기시간")]
     [SerializeField]
     private float interruptedRecovery = 0.25f;
+
 
     [Tooltip("플레이어가 맞았을 때 넉백")]
     [SerializeField]
@@ -35,20 +40,19 @@ public sealed class EnemyAttack : MonoBehaviour
 
 
     // =========================================================
-    // Warning Visual
+    // Warning
     // =========================================================
 
     [Header("Red Warning Area")]
 
-    [Tooltip("경고 원의 기본 투명도")]
     [SerializeField, Range(0f, 1f)]
     private float warningStartAlpha = 0.18f;
 
-    [Tooltip("공격 직전 경고 원의 투명도")]
+
     [SerializeField, Range(0f, 1f)]
     private float warningEndAlpha = 0.52f;
 
-    [Tooltip("경고 범위 Sprite의 Sorting Order")]
+
     [SerializeField]
     private int warningSortingOrder = -2;
 
@@ -68,6 +72,10 @@ public sealed class EnemyAttack : MonoBehaviour
     private static Sprite warningCircleSprite;
 
 
+    // =========================================================
+    // Properties
+    // =========================================================
+
     public bool IsPreparingAttack =>
         isPreparingAttack;
 
@@ -81,31 +89,27 @@ public sealed class EnemyAttack : MonoBehaviour
         bool canAttack
     )
     {
-        // =========================================
         // 플레이어 없음
-        // =========================================
-
         if (player == null)
         {
             CancelAttack(false);
+
             return;
         }
 
 
-        // =========================================
         // 스턴 등으로 공격 불가능
-        // =========================================
-
         if (!canAttack)
         {
             CancelAttack(true);
+
             return;
         }
 
 
-        // =========================================
-        // 현재 공격 준비 중
-        // =========================================
+        // =====================================================
+        // 현재 공격 중
+        // =====================================================
 
         if (isPreparingAttack)
         {
@@ -119,7 +123,6 @@ public sealed class EnemyAttack : MonoBehaviour
             {
                 ExecuteAttack();
 
-
                 FinishAttack();
             }
 
@@ -128,9 +131,9 @@ public sealed class EnemyAttack : MonoBehaviour
         }
 
 
-        // =========================================
-        // 쿨타임
-        // =========================================
+        // =====================================================
+        // Cooldown
+        // =====================================================
 
         if (
             Time.time <
@@ -141,9 +144,9 @@ public sealed class EnemyAttack : MonoBehaviour
         }
 
 
-        // =========================================
-        // 플레이어와 거리
-        // =========================================
+        // =====================================================
+        // 거리 검사
+        // =====================================================
 
         float distance =
             Vector2.Distance(
@@ -152,7 +155,6 @@ public sealed class EnemyAttack : MonoBehaviour
             );
 
 
-        // 아직 감지 범위 밖
         if (
             distance >
             detectionRange
@@ -162,16 +164,16 @@ public sealed class EnemyAttack : MonoBehaviour
         }
 
 
-        // =========================================
+        // =====================================================
         // 공격 시작
-        // =========================================
+        // =====================================================
 
         StartAttack();
     }
 
 
     // =========================================================
-    // Attack Start
+    // Start Attack
     // =========================================================
 
     private void StartAttack()
@@ -182,6 +184,8 @@ public sealed class EnemyAttack : MonoBehaviour
         }
 
 
+        // 이 값이 true가 되는 순간
+        // Enemy.cs에서 enemyattack을 재생한다.
         isPreparingAttack =
             true;
 
@@ -197,13 +201,12 @@ public sealed class EnemyAttack : MonoBehaviour
 
         ShowWarningArea();
 
-
         UpdateWarningVisual();
     }
 
 
     // =========================================================
-    // 실제 근접 범위 공격
+    // Execute Attack
     // =========================================================
 
     private void ExecuteAttack()
@@ -212,10 +215,6 @@ public sealed class EnemyAttack : MonoBehaviour
             transform.position;
 
 
-        // =========================================
-        // 빨간 원과 정확히 같은 크기로 검사
-        // =========================================
-
         Collider2D[] hits =
             Physics2D.OverlapCircleAll(
                 center,
@@ -223,8 +222,6 @@ public sealed class EnemyAttack : MonoBehaviour
             );
 
 
-        // Player가 Collider를 여러 개 가지고 있어도
-        // 한 번만 맞도록 처리
         HashSet<Player> hitPlayers =
             new HashSet<Player>();
 
@@ -245,7 +242,8 @@ public sealed class EnemyAttack : MonoBehaviour
 
 
             if (
-                player == null ||
+                player == null
+                ||
                 hitPlayers.Contains(player)
             )
             {
@@ -256,16 +254,17 @@ public sealed class EnemyAttack : MonoBehaviour
             hitPlayers.Add(player);
 
 
-            // =========================================
-            // 대시 후 무적 확인
-            // =========================================
+            // =================================================
+            // Blue Dash 무적
+            // =================================================
 
             PlayerInvulnerability invulnerability =
                 player.GetComponent<PlayerInvulnerability>();
 
 
             if (
-                invulnerability != null &&
+                invulnerability != null
+                &&
                 invulnerability.IsInvulnerable
             )
             {
@@ -273,15 +272,83 @@ public sealed class EnemyAttack : MonoBehaviour
             }
 
 
-            // =========================================
-            // 실제로 범위 안에 있을 때만 데미지
-            // =========================================
+            // =================================================
+            // Damage
+            // =================================================
 
             player.ReceiveHit(
                 center,
                 knockbackForce
             );
         }
+    }
+
+
+    // =========================================================
+    // Finish
+    // =========================================================
+
+    private void FinishAttack()
+    {
+        isPreparingAttack =
+            false;
+
+
+        HideWarningArea();
+
+
+        nextAttackTime =
+            Time.time +
+            attackCooldown;
+    }
+
+
+    // =========================================================
+    // Cancel
+    // =========================================================
+
+    private void CancelAttack(
+        bool applyRecovery
+    )
+    {
+        if (!isPreparingAttack)
+        {
+            return;
+        }
+
+
+        isPreparingAttack =
+            false;
+
+
+        HideWarningArea();
+
+
+        if (applyRecovery)
+        {
+            nextAttackTime =
+                Mathf.Max(
+                    nextAttackTime,
+                    Time.time
+                    +
+                    interruptedRecovery
+                );
+        }
+    }
+
+
+    // 사망 시 사용
+    public void CancelAll()
+    {
+        isPreparingAttack =
+            false;
+
+
+        HideWarningArea();
+
+
+        nextAttackTime =
+            float.MaxValue;
     }
 
 
@@ -300,10 +367,9 @@ public sealed class EnemyAttack : MonoBehaviour
         }
 
 
-        // Sprite 원본의 월드 크기가 1x1이므로
-        // 지름 = attackRadius * 2
         float diameter =
-            attackRadius * 2f;
+            attackRadius *
+            2f;
 
 
         warningRenderer.transform.localScale =
@@ -326,7 +392,8 @@ public sealed class EnemyAttack : MonoBehaviour
     private void UpdateWarningVisual()
     {
         if (
-            warningRenderer == null ||
+            warningRenderer == null
+            ||
             !warningRenderer.enabled
         )
         {
@@ -337,16 +404,21 @@ public sealed class EnemyAttack : MonoBehaviour
         float progress;
 
 
-        if (attackWindup <= 0.001f)
+        if (
+            attackWindup <=
+            0.001f
+        )
         {
-            progress = 1f;
+            progress =
+                1f;
         }
         else
         {
             progress =
                 Mathf.Clamp01(
                     (
-                        Time.time -
+                        Time.time
+                        -
                         attackStartTime
                     )
                     /
@@ -355,8 +427,6 @@ public sealed class EnemyAttack : MonoBehaviour
         }
 
 
-        // 공격에 가까워질수록
-        // 붉은색이 진해짐
         float alpha =
             Mathf.Lerp(
                 warningStartAlpha,
@@ -365,10 +435,11 @@ public sealed class EnemyAttack : MonoBehaviour
             );
 
 
-        // 살짝 깜빡이는 효과
+        // 살짝 깜빡이기
         float pulse =
             Mathf.Sin(
-                Time.time * 28f
+                Time.time *
+                28f
             )
             *
             0.035f;
@@ -402,58 +473,6 @@ public sealed class EnemyAttack : MonoBehaviour
 
 
     // =========================================================
-    // Attack Finish
-    // =========================================================
-
-    private void FinishAttack()
-    {
-        isPreparingAttack =
-            false;
-
-
-        HideWarningArea();
-
-
-        nextAttackTime =
-            Time.time +
-            attackCooldown;
-    }
-
-
-    // =========================================================
-    // Attack Cancel
-    // =========================================================
-
-    private void CancelAttack(
-        bool applyRecovery
-    )
-    {
-        if (!isPreparingAttack)
-        {
-            return;
-        }
-
-
-        isPreparingAttack =
-            false;
-
-
-        HideWarningArea();
-
-
-        if (applyRecovery)
-        {
-            nextAttackTime =
-                Mathf.Max(
-                    nextAttackTime,
-                    Time.time +
-                    interruptedRecovery
-                );
-        }
-    }
-
-
-    // =========================================================
     // Warning Renderer
     // =========================================================
 
@@ -482,7 +501,8 @@ public sealed class EnemyAttack : MonoBehaviour
 
 
         warningRenderer =
-            warningObject.AddComponent<SpriteRenderer>();
+            warningObject
+                .AddComponent<SpriteRenderer>();
 
 
         warningRenderer.sprite =
@@ -508,7 +528,7 @@ public sealed class EnemyAttack : MonoBehaviour
 
 
     // =========================================================
-    // 빨간 원 Sprite 자동 생성
+    // Warning Circle
     // =========================================================
 
     private static Sprite GetWarningCircleSprite()
@@ -553,8 +573,11 @@ public sealed class EnemyAttack : MonoBehaviour
 
         Vector2 center =
             new Vector2(
-                (textureSize - 1) * 0.5f,
-                (textureSize - 1) * 0.5f
+                (textureSize - 1) *
+                0.5f,
+
+                (textureSize - 1) *
+                0.5f
             );
 
 
@@ -582,7 +605,10 @@ public sealed class EnemyAttack : MonoBehaviour
             {
                 float distance =
                     Vector2.Distance(
-                        new Vector2(x, y),
+                        new Vector2(
+                            x,
+                            y
+                        ),
                         center
                     );
 
@@ -591,14 +617,17 @@ public sealed class EnemyAttack : MonoBehaviour
                     0f;
 
 
-                if (distance <= radius)
+                if (
+                    distance <=
+                    radius
+                )
                 {
-                    // 내부는 옅게
+                    // 내부
                     alpha =
                         0.45f;
 
 
-                    // 가장자리 링은 더 진하게
+                    // 테두리
                     if (
                         distance >=
                         borderStart
@@ -621,7 +650,7 @@ public sealed class EnemyAttack : MonoBehaviour
                     }
 
 
-                    // 가장자리 안티앨리어싱
+                    // 안티앨리어싱
                     if (
                         distance >
                         radius - 1.5f
@@ -637,7 +666,9 @@ public sealed class EnemyAttack : MonoBehaviour
 
 
                 pixels[
-                    y * textureSize + x
+                    y *
+                    textureSize +
+                    x
                 ] =
                     new Color(
                         1f,
@@ -660,18 +691,19 @@ public sealed class EnemyAttack : MonoBehaviour
         warningCircleSprite =
             Sprite.Create(
                 texture,
+
                 new Rect(
                     0f,
                     0f,
                     textureSize,
                     textureSize
                 ),
+
                 new Vector2(
                     0.5f,
                     0.5f
                 ),
 
-                // Sprite 자체의 월드 크기 = 1
                 textureSize
             );
 
@@ -763,7 +795,6 @@ public sealed class EnemyAttack : MonoBehaviour
 
     private void OnDrawGizmosSelected()
     {
-        // 실제 공격 범위
         Gizmos.DrawWireSphere(
             transform.position,
             attackRadius

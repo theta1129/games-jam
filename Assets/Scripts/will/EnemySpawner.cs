@@ -1,6 +1,8 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class EnemySpawner : MonoBehaviour
 {
@@ -11,9 +13,21 @@ public class EnemySpawner : MonoBehaviour
 
     private List<GameObject> enemies = new();
     [SerializeField] private int maxEnemyCount = 5;
+    [SerializeField] private Image black;
     void Start()
     {
-        
+        StartCoroutine(FadeOut());
+    }
+
+    private IEnumerator FadeOut()
+    {
+        while (black.color.a > 0)
+        {
+            Color color = black.color;
+            color.a -= 0.05f;
+            black.color = color;
+            yield return new WaitForSeconds(0.05f);
+        }
     }
 
     void Update()
