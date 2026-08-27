@@ -51,6 +51,18 @@ public class Player : MonoBehaviour
     [SerializeField] private float receivedHitStop = 0.06f;
     [SerializeField] private float receivedHitShakeIntensity = 0.25f;
 
+    [Header("Weapon SFX")]
+    [SerializeField] private AudioSource weaponAudioSource;
+    [SerializeField] private AudioClip redAttackSfx;
+    [SerializeField] private AudioClip redHitSfx;
+    [SerializeField] private AudioClip blueAttackSfx;
+    [SerializeField] private AudioClip blueHitSfx;
+    [SerializeField] private AudioClip yellowAttackSfx;
+    [SerializeField] private AudioClip yellowHitSfx;
+    [SerializeField] private AudioClip wrongWeaponSfx;
+    [SerializeField, Range(0f, 1f)] private float weaponAttackSfxVolume = 0.82f;
+    [SerializeField, Range(0f, 1f)] private float weaponHitSfxVolume = 0.95f;
+
     [Header("HUD")]
     [SerializeField] private bool showColorWheel = true;
     [SerializeField] private float colorWheelRotateDuration = 0.18f;
@@ -239,6 +251,8 @@ public class Player : MonoBehaviour
         SetupRuntimeAnimatorOverride();
 
         attackHitBox?.SetColor(attackColor);
+
+        EnsureWeaponAudioSource();
 
         CreateStates();
         ChangeState(PlayerStates.Idle);
@@ -588,6 +602,102 @@ public class Player : MonoBehaviour
     }
 
     // =========================================================
+    // Weapon SFX
+    // =========================================================
+
+    internal void PlayWeaponHitSfx(
+        ColorType colorType,
+        bool correctColor
+    )
+    {
+        AudioClip clip =
+            correctColor
+                ? GetWeaponHitClip(colorType)
+                : wrongWeaponSfx;
+
+        PlayWeaponSfx(
+            clip,
+            weaponHitSfxVolume
+        );
+    }
+
+    private void PlayWeaponAttackSfx(
+        ColorType colorType
+    )
+    {
+        PlayWeaponSfx(
+            GetWeaponAttackClip(colorType),
+            weaponAttackSfxVolume
+        );
+    }
+
+    private void PlayWeaponSfx(
+        AudioClip clip,
+        float volume
+    )
+    {
+        if (clip == null)
+        {
+            return;
+        }
+
+        EnsureWeaponAudioSource();
+
+        if (weaponAudioSource == null)
+        {
+            return;
+        }
+
+        weaponAudioSource.PlayOneShot(
+            clip,
+            Mathf.Clamp01(volume)
+        );
+    }
+
+    private void EnsureWeaponAudioSource()
+    {
+        if (weaponAudioSource == null)
+        {
+            weaponAudioSource =
+                GetComponent<AudioSource>();
+        }
+
+        if (weaponAudioSource == null)
+        {
+            weaponAudioSource =
+                gameObject.AddComponent<AudioSource>();
+        }
+
+        weaponAudioSource.playOnAwake = false;
+        weaponAudioSource.loop = false;
+        weaponAudioSource.spatialBlend = 0f;
+    }
+
+    private AudioClip GetWeaponAttackClip(
+        ColorType colorType
+    )
+    {
+        return colorType switch
+        {
+            ColorType.Blue => blueAttackSfx,
+            ColorType.Yellow => yellowAttackSfx,
+            _ => redAttackSfx
+        };
+    }
+
+    private AudioClip GetWeaponHitClip(
+        ColorType colorType
+    )
+    {
+        return colorType switch
+        {
+            ColorType.Blue => blueHitSfx,
+            ColorType.Yellow => yellowHitSfx,
+            _ => redHitSfx
+        };
+    }
+
+    // =========================================================
     // Attack
     // =========================================================
 
@@ -634,6 +744,10 @@ public class Player : MonoBehaviour
 
             case ColorType.Blue when step == 2:
 
+                PlayWeaponAttackSfx(
+                    attackColor
+                );
+
                 ShakeCamera(
                     0.08f,
                     0.08f
@@ -667,6 +781,10 @@ public class Player : MonoBehaviour
 
             case ColorType.Blue:
 
+                PlayWeaponAttackSfx(
+                    attackColor
+                );
+
                 ShakeCamera(
                     0.055f,
                     0.045f
@@ -699,6 +817,10 @@ public class Player : MonoBehaviour
             // =================================================
 
             case ColorType.Yellow:
+
+                PlayWeaponAttackSfx(
+                    attackColor
+                );
 
                 ShakeCamera(
                     0.065f,
@@ -734,6 +856,10 @@ public class Player : MonoBehaviour
             // =================================================
 
             default:
+
+                PlayWeaponAttackSfx(
+                    attackColor
+                );
 
                 ShakeCamera(
                     0.09f,
@@ -859,6 +985,10 @@ public class Player : MonoBehaviour
         UpdatePlayerAnimation();
 
         attackHitBox.ReleaseComboPose(direction);
+
+        PlayWeaponAttackSfx(
+            ColorType.Yellow
+        );
 
         ShakeCamera(
             0.075f,

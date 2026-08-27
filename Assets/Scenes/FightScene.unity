@@ -1283,6 +1283,16 @@ MonoBehaviour:
   heartHudSpacing: 8
   receivedHitStop: 0.06
   receivedHitShakeIntensity: 0.25
+  weaponAudioSource: {fileID: 0}
+  redAttackSfx: {fileID: 8300000, guid: a7796deaf4a19d64d891266645ab043b, type: 3}
+  redHitSfx: {fileID: 8300000, guid: 42db7b44b4bf559438f90ab7cfabc217, type: 3}
+  blueAttackSfx: {fileID: 8300000, guid: 8dd97e9b78a3b8d40a29aee4bdb72788, type: 3}
+  blueHitSfx: {fileID: 8300000, guid: 99dd52b884033024887eba4d3cc788b1, type: 3}
+  yellowAttackSfx: {fileID: 8300000, guid: 90f0f35a6b5c58f469087368320f2c2c, type: 3}
+  yellowHitSfx: {fileID: 8300000, guid: eab1a3082cced494f85904496fddf1c8, type: 3}
+  wrongWeaponSfx: {fileID: 8300000, guid: 2b035855647818a4884820a47c9e3fa7, type: 3}
+  weaponAttackSfxVolume: 0.82
+  weaponHitSfxVolume: 0.95
   showColorWheel: 1
   colorWheelRotateDuration: 0.18
   inputActions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}

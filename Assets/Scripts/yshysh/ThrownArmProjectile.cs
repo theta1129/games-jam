@@ -324,6 +324,13 @@ public sealed class ThrownArmProjectile : MonoBehaviour
         }
 
 
+        bool correctColor =
+            enemy.pattern != null
+            &&
+            enemy.pattern.Count > 0
+            &&
+            enemy.pattern[0] == ColorType.Yellow;
+
         // 노란색 공격이 실제로 성공했을 때만
         if (
             enemy.OnHit(
@@ -333,6 +340,17 @@ public sealed class ThrownArmProjectile : MonoBehaviour
             )
         )
         {
+            Player.Instance?.PlayWeaponHitSfx(
+                ColorType.Yellow,
+                correctColor
+            );
+
+            if (!correctColor)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
             // ==========================================
             // 우클릭 투척 추가 스턴
             // ==========================================

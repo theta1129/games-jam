@@ -582,10 +582,18 @@ public class PlayerAttackHitBox : MonoBehaviour
         Enemy enemy = other.GetComponentInParent<Enemy>();
         if (enemy == null || enemy.pattern == null || enemy.pattern.Count == 0 || hitEnemies.Contains(enemy)) return;
 
+        bool correctColor =
+            enemy.pattern[0] == activeColor;
+
         // Enemy.OnHit returns true for any real contact, even when the color is wrong.
         // Therefore wrong-color hits still consume this enemy once for this attack,
         // while health reduction is handled separately inside Enemy.
         if (!enemy.OnHit(activeColor, transform.position, activeKnockbackForce)) return;
+
+        Player.Instance?.PlayWeaponHitSfx(
+            activeColor,
+            correctColor
+        );
 
         // Area attack rule: each enemy can be hit once per attack, but hitting one
         // enemy NEVER turns the hitbox off. Every other enemy in the area is processed.
